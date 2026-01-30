@@ -2,15 +2,15 @@ import * as http from "http";
 import * as crypto from "crypto";
 import { setOuraTokens, getConfigPath } from "../lib/config";
 
-// Oura OAuth 설정 - 환경변수 또는 기본값 사용
-const OURA_CLIENT_ID = process.env.OURA_CLIENT_ID || "095f7bec-5809-4ec1-a9f4-55781263e521";
+// Oura OAuth config - use environment variables
+const OURA_CLIENT_ID = process.env.OURA_CLIENT_ID || "";
 const OURA_CLIENT_SECRET = process.env.OURA_CLIENT_SECRET || "";
 const OURA_AUTH_URL = "https://cloud.ouraring.com/oauth/authorize";
 const OURA_TOKEN_URL = "https://api.ouraring.com/oauth/token";
 const REDIRECT_URI = "http://localhost:3360/callback";
 const SCOPES = "daily personal heartrate workout tag session spo2";
 
-// PKCE 생성
+// PKCE generation
 function generateCodeVerifier(): string {
   return crypto.randomBytes(32).toString("base64url");
 }
@@ -20,12 +20,12 @@ function generateCodeChallenge(verifier: string): string {
 }
 
 export async function loginCommand(): Promise<void> {
-  // Client Secret이 없으면 PAT 안내
+  // If no client secret, show instructions
   if (!OURA_CLIENT_SECRET) {
     console.log("");
     console.log("  🔐 Oura Ring Login");
     console.log("");
-    console.log("  OAuth를 사용하려면 환경변수를 설정하세요:");
+    console.log("  To use OAuth, set environment variables:");
     console.log("");
     console.log("    export OURA_CLIENT_ID=your_client_id");
     console.log("    export OURA_CLIENT_SECRET=your_client_secret");
@@ -33,14 +33,14 @@ export async function loginCommand(): Promise<void> {
     console.log("");
     console.log("  ─────────────────────────────────────");
     console.log("");
-    console.log("  또는 Personal Access Token 사용:");
+    console.log("  Or use a Personal Access Token:");
     console.log("");
     console.log("    p360 login --token YOUR_TOKEN");
     console.log("");
     return;
   }
 
-  // OAuth flow 시작
+  // Start OAuth flow
   await startOAuthFlow();
 }
 
@@ -49,7 +49,7 @@ async function startOAuthFlow(): Promise<void> {
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = generateCodeChallenge(codeVerifier);
 
-  // Authorization URL 생성
+  // Build authorization URL
   const authUrl = new URL(OURA_AUTH_URL);
   authUrl.searchParams.set("client_id", OURA_CLIENT_ID);
   authUrl.searchParams.set("redirect_uri", REDIRECT_URI);
@@ -62,21 +62,21 @@ async function startOAuthFlow(): Promise<void> {
   console.log("");
   console.log("  🔐 Oura Ring OAuth Login");
   console.log("");
-  console.log("  브라우저에서 다음 URL을 열어 로그인하세요:");
+  console.log("  Open this URL in your browser to log in:");
   console.log("");
   console.log(`  ${authUrl.toString()}`);
   console.log("");
-  console.log("  대기 중...");
+  console.log("  Waiting for authorization...");
 
-  // 로컬 서버로 callback 대기
+  // Wait for callback on local server
   try {
     const code = await waitForCallback(state);
-    console.log("  인증 코드 수신!");
+    console.log("  Authorization code received!");
 
     // Token exchange
     await exchangeToken(code, codeVerifier);
   } catch (error) {
-    console.error("  ❌ OAuth 실패:", error instanceof Error ? error.message : error);
+    console.error("  ❌ OAuth failed:", error instanceof Error ? error.message : error);
     process.exit(1);
   }
 }
@@ -93,7 +93,7 @@ function waitForCallback(expectedState: string): Promise<string> {
 
         if (error) {
           res.writeHead(400, { "Content-Type": "text/html; charset=utf-8" });
-          res.end(`<h1>❌ 오류: ${error}</h1><p>터미널로 돌아가세요.</p>`);
+          res.end(`<h1>❌ Error: ${error}</h1><p>Return to terminal.</p>`);
           server.close();
           reject(new Error(error));
           return;
@@ -120,8 +120,8 @@ function waitForCallback(expectedState: string): Promise<string> {
           <html>
             <body style="font-family: system-ui; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #0F172A; color: white;">
               <div style="text-align: center;">
-                <h1>✅ 연결 완료!</h1>
-                <p>이 창을 닫고 터미널로 돌아가세요.</p>
+                <h1>✅ Connected!</h1>
+                <p>You can close this window and return to the terminal.</p>
               </div>
             </body>
           </html>
@@ -133,19 +133,19 @@ function waitForCallback(expectedState: string): Promise<string> {
     });
 
     server.listen(3360, () => {
-      // 서버 시작됨
+      // Server started
     });
 
-    // 5분 타임아웃
+    // 5 minute timeout
     setTimeout(() => {
       server.close();
-      reject(new Error("Timeout - 5분 초과"));
+      reject(new Error("Timeout - exceeded 5 minutes"));
     }, 5 * 60 * 1000);
   });
 }
 
 async function exchangeToken(code: string, codeVerifier: string): Promise<void> {
-  console.log("  토큰 교환 중...");
+  console.log("  Exchanging token...");
 
   const params = new URLSearchParams();
   params.set("grant_type", "authorization_code");
@@ -175,7 +175,7 @@ async function exchangeToken(code: string, codeVerifier: string): Promise<void> 
     token_type: string;
   };
 
-  // 토큰 저장
+  // Save tokens
   setOuraTokens({
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
@@ -183,12 +183,12 @@ async function exchangeToken(code: string, codeVerifier: string): Promise<void> 
   });
 
   console.log("");
-  console.log("  ✅ Oura Ring 연결 완료!");
+  console.log("  ✅ Oura Ring connected!");
   console.log("");
-  console.log("  이제 다음 명령어를 사용할 수 있습니다:");
+  console.log("  You can now run:");
   console.log("     p360 workout");
   console.log("");
-  console.log(`  설정 파일: ${getConfigPath()}`);
+  console.log(`  Config saved at: ${getConfigPath()}`);
   console.log("");
 }
 
@@ -205,7 +205,7 @@ export async function loginWithToken(options: LoginTokenOptions): Promise<void> 
   }
 
   console.log("");
-  console.log("  토큰 검증 중...");
+  console.log("  Validating token...");
 
   try {
     const response = await fetch(
@@ -219,9 +219,9 @@ export async function loginWithToken(options: LoginTokenOptions): Promise<void> 
 
     if (!response.ok) {
       if (response.status === 401) {
-        console.error("  ❌ 유효하지 않은 토큰입니다.");
+        console.error("  ❌ Invalid token.");
       } else {
-        console.error(`  ❌ 오류: HTTP ${response.status}`);
+        console.error(`  ❌ Error: HTTP ${response.status}`);
       }
       process.exit(1);
     }
@@ -232,16 +232,16 @@ export async function loginWithToken(options: LoginTokenOptions): Promise<void> 
       expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
     });
 
-    console.log("  ✅ 토큰 저장 완료!");
+    console.log("  ✅ Token saved!");
     console.log("");
-    console.log("  이제 다음 명령어를 사용할 수 있습니다:");
+    console.log("  You can now run:");
     console.log("     p360 workout");
     console.log("");
-    console.log(`  설정 파일: ${getConfigPath()}`);
+    console.log(`  Config saved at: ${getConfigPath()}`);
     console.log("");
   } catch (error) {
     console.error(
-      "  ❌ 토큰 검증 오류:",
+      "  ❌ Token validation error:",
       error instanceof Error ? error.message : error
     );
     process.exit(1);

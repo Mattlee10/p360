@@ -1,0 +1,29 @@
+{
+  "name": "@p360/core",
+  "version": "0.1.0",
+  "description": "P360 Core Algorithm - Biometric-driven decision support",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "test": "vitest",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": ["biometrics", "hrv", "oura", "decision-support"],
+  "author": "P360",
+  "license": "MIT",
+  "devDependencies": {
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  }
+}
