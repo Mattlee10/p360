@@ -1,0 +1,29 @@
+{
+  "name": "p360-telegram",
+  "version": "0.1.0",
+  "description": "Telegram bot that tells you if you should work out today based on your Oura data",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": ["oura", "biometrics", "hrv", "workout", "telegram", "bot"],
+  "author": "P360",
+  "license": "MIT",
+  "dependencies": {
+    "grammy": "^1.21.0",
+    "dotenv": "^16.3.1",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/node-cron": "^3.0.11",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

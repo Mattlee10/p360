@@ -1,0 +1,28 @@
+{
+  "name": "p360-cli",
+  "version": "0.1.0",
+  "description": "CLI tool that tells you if you should work out today based on your Oura data",
+  "main": "dist/index.js",
+  "bin": {
+    "p360": "./bin/p360"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": ["oura", "biometrics", "hrv", "workout", "cli", "fitness"],
+  "author": "P360",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
