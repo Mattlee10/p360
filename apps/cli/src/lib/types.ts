@@ -50,6 +50,33 @@ export interface OuraTokens {
 // Workout decision types
 export type WorkoutVerdict = "train_hard" | "train_light" | "rest";
 
+// Supported sports
+export type Sport =
+  | "basketball"
+  | "running"
+  | "cycling"
+  | "weightlifting"
+  | "crossfit"
+  | "swimming"
+  | "yoga"
+  | "soccer"
+  | "tennis"
+  | "golf"
+  | "hiking"
+  | "climbing"
+  | "martial_arts"
+  | "general";
+
+export interface SportGuide {
+  sport: Sport;
+  displayName: string;
+  todayAdvice: string;
+  intensityTips: string[];
+  warmup: string;
+  duration: string;
+  cautionNotes?: string[];
+}
+
 export interface WorkoutDecision {
   verdict: WorkoutVerdict;
   confidence: number;
@@ -67,4 +94,13 @@ export interface WorkoutDecision {
     hrv: { value: number | null; trend: string };
     sleep: { value: number | null; hours?: string };
   };
+  // New fields
+  reasoning: string[];           // Why this verdict
+  intensityGuide: {
+    cardio?: string;             // e.g., "Zone 4-5, HR 160-180"
+    weights?: string;            // e.g., "85-95% 1RM, 3-5 reps"
+    duration?: string;           // e.g., "45-90 min"
+    rpe?: string;                // e.g., "8-10 RPE"
+  };
+  sportGuide?: SportGuide;       // Sport-specific guidance
 }

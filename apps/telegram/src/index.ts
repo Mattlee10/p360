@@ -7,7 +7,11 @@ import {
   handleDisconnect,
   handleStatus,
   handleWorkout,
+  handleSports,
   handleDemo,
+  handleFeedback,
+  handleDrink,
+  handleDrinkDemo,
   handleUnknown,
 } from "./bot/handlers";
 
@@ -39,7 +43,12 @@ bot.command("disconnect", handleDisconnect);
 bot.command("status", handleStatus);
 bot.command("workout", handleWorkout);
 bot.command("w", handleWorkout); // shortcut
+bot.command("sports", handleSports);
 bot.command("demo", handleDemo);
+bot.command("feedback", handleFeedback);
+bot.command("drink", handleDrink);
+bot.command("d", handleDrink); // shortcut
+bot.command("drinkdemo", handleDrinkDemo);
 
 // Handle unknown commands
 bot.on("message:text", (ctx) => {
@@ -63,10 +72,16 @@ bot.start({
     console.log(`✅ Bot started: @${botInfo.username}`);
     console.log("");
     console.log("Available commands:");
-    console.log("  /workout - Check workout readiness");
-    console.log("  /connect - Link Oura Ring");
-    console.log("  /demo    - Try with demo data");
-    console.log("  /help    - Show all commands");
+    console.log("  /workout          - Check workout readiness");
+    console.log("  /workout bball    - Sport-specific guide");
+    console.log("  /sports           - List available sports");
+    console.log("  /drink            - Check drinking limit");
+    console.log("  /drink log N      - Log drinks (e.g. /drink log 3)");
+    console.log("  /drink history    - See your drinking patterns");
+    console.log("  /drink social     - Social event strategy");
+    console.log("  /connect          - Link Oura Ring");
+    console.log("  /demo             - Try with demo data");
+    console.log("  /help             - Show all commands");
     console.log("");
     console.log("Press Ctrl+C to stop");
   },

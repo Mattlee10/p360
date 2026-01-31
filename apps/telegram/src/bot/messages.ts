@@ -1,15 +1,20 @@
 export const MESSAGES = {
   welcome: `👋 <b>Welcome to P360!</b>
 
-I help you decide if you should work out today based on your Oura Ring data.
+I help you make better decisions based on your Oura Ring data.
+
+<b>What I can do:</b>
+🏋️ /workout - Should I train today?
+🍺 /drink - How much can I drink tonight?
 
 <b>Quick Start:</b>
 1. Get your Oura Personal Access Token
 2. Run /connect YOUR_TOKEN
-3. Ask me /workout anytime
+3. Ask me anytime!
 
 <b>Commands:</b>
-/workout - Should I train today?
+/workout - Training recommendation
+/drink - Drinking limit guide
 /connect - Link your Oura Ring
 /demo - Try with sample data
 /help - Show all commands`,
@@ -20,13 +25,21 @@ I help you decide if you should work out today based on your Oura Ring data.
 /workout - Get your training recommendation
 /w - Shortcut for /workout
 
+🍺 <b>Drink Guide</b>
+/drink - How much can I drink tonight?
+/d - Shortcut for /drink
+/drink log N - Log drinks (e.g. /drink log 3)
+/drink history - See your drinking patterns
+/drink social - Social event strategy
+
 🔗 <b>Connection</b>
 /connect TOKEN - Link your Oura Ring
 /status - Check connection status
 /disconnect - Remove Oura connection
 
 🎮 <b>Demo</b>
-/demo - Try with random sample data
+/demo - Try workout with sample data
+/drinkdemo - Try drink with sample data
 
 ❓ <b>Help</b>
 /help - Show this message

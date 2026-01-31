@@ -28,9 +28,9 @@ export interface OuraDailyReadiness {
 
 // User storage
 export interface UserData {
-  odatelegramId: number;
+  telegramId: number;
   ouraToken?: string;
-  morningAlertTime?: string; // "07:00"
+  morningAlertTime?: string;
   timezone?: string;
   createdAt: Date;
   lastCheckAt?: Date;
@@ -38,6 +38,33 @@ export interface UserData {
 
 // Workout decision types
 export type WorkoutVerdict = "train_hard" | "train_light" | "rest";
+
+// Supported sports
+export type Sport =
+  | "basketball"
+  | "running"
+  | "cycling"
+  | "weightlifting"
+  | "crossfit"
+  | "swimming"
+  | "yoga"
+  | "soccer"
+  | "tennis"
+  | "golf"
+  | "hiking"
+  | "climbing"
+  | "martial_arts"
+  | "general";
+
+export interface SportGuide {
+  sport: Sport;
+  displayName: string;
+  todayAdvice: string;
+  intensityTips: string[];
+  warmup: string;
+  duration: string;
+  cautionNotes?: string[];
+}
 
 export interface WorkoutDecision {
   verdict: WorkoutVerdict;
@@ -56,4 +83,12 @@ export interface WorkoutDecision {
     hrv: { value: number | null; trend: string };
     sleep: { value: number | null; hours?: string };
   };
+  reasoning: string[];
+  intensityGuide: {
+    cardio?: string;
+    weights?: string;
+    duration?: string;
+    rpe?: string;
+  };
+  sportGuide?: SportGuide;
 }

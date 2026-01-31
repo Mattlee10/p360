@@ -32,12 +32,13 @@ coverage/
 tmp/
 temp/
 
+# External repos (forks, references)
+_external/
+
 # Private docs (internal strategy, not for public)
 CLAUDE.md
-P360_CORE.md
-docs/GTM_MATERIALS.md
-docs/P1_SOLUTION_HYPOTHESES.md
-docs/S1-E_IMPLEMENTATION.md
+docs/core/
+docs/gtm/
 docs/research/
-archive/
-biohacker_pain_point_monitoring_guide.md
+docs/legal/
+docs/archive/

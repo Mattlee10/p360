@@ -20,6 +20,7 @@ program
   .option("-j, --json", "Output as JSON")
   .option("-c, --compact", "Output in compact format")
   .option("-d, --demo", "Use demo data (no Oura connection needed)")
+  .option("-s, --sport <sport>", "Get sport-specific guidance (e.g., basketball, running, cycling)")
   .action(workoutCommand);
 
 // Login command
