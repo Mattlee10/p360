@@ -8,6 +8,9 @@ import {
   updateLastCheck,
   addDrinkLog,
   getDrinkLogs,
+  getBotStats,
+  getCommandCounts,
+  incrementCommandCount,
 } from "../lib/storage";
 import { fetchBiometricData, getRandomDemoData } from "../lib/oura";
 import { getWorkoutDecision, formatWorkoutTelegram, parseSport, getSportList } from "../lib/workout";
@@ -20,6 +23,11 @@ import {
   getSocialStrategy,
   calculateDrinkHistory,
 } from "../lib/drink";
+import {
+  getWhyDecision,
+  formatWhyTelegram,
+  parseWhyInput,
+} from "../lib/why";
 
 // Helper to send HTML messages
 async function reply(ctx: Context, text: string) {
@@ -29,8 +37,10 @@ async function reply(ctx: Context, text: string) {
 // /start command
 export async function handleStart(ctx: Context) {
   const telegramId = ctx.from?.id;
+  const username = ctx.from?.username || "unknown";
   if (telegramId) {
     setUser(telegramId, {});
+    console.log(`🆕 New user: @${username} (${telegramId})`);
   }
   await reply(ctx, MESSAGES.welcome);
 }
@@ -104,6 +114,9 @@ export async function handleWorkout(ctx: Context) {
   const telegramId = ctx.from?.id;
   if (!telegramId) return;
 
+  incrementCommandCount("workout");
+  console.log(`📊 /workout from ${telegramId}`);
+
   const token = getOuraToken(telegramId);
 
   if (!token) {
@@ -158,6 +171,9 @@ export async function handleDemo(ctx: Context) {
   if (telegramId) {
     setUser(telegramId, {});
   }
+
+  incrementCommandCount("demo");
+  console.log(`📊 /demo from ${telegramId}`);
 
   // Parse sport from command
   const text = ctx.message?.text || "";
@@ -220,6 +236,9 @@ export async function handleFeedback(ctx: Context) {
 export async function handleDrink(ctx: Context) {
   const telegramId = ctx.from?.id;
   if (!telegramId) return;
+
+  incrementCommandCount("drink");
+  console.log(`📊 /drink from ${telegramId}`);
 
   const token = getOuraToken(telegramId);
 
@@ -321,11 +340,113 @@ export async function handleDrinkDemo(ctx: Context) {
     setUser(telegramId, {});
   }
 
+  incrementCommandCount("drinkdemo");
+  console.log(`📊 /drinkdemo from ${telegramId}`);
+
   await ctx.reply("🎲 Generating random scenario...");
 
   const data = getRandomDemoData();
   const decision = getDrinkDecision(data);
   const message = formatDrinkTelegram(decision);
+
+  const demoNote = `\n\n<i>📝 This is demo data. Use /connect to see your real Oura data.</i>`;
+
+  await reply(ctx, message + demoNote);
+}
+
+// /stats command - admin only stats
+export async function handleStats(ctx: Context) {
+  const telegramId = ctx.from?.id;
+
+  // Only allow admin to see stats
+  if (!ADMIN_CHAT_ID || String(telegramId) !== ADMIN_CHAT_ID) {
+    await reply(ctx, `❓ Unknown command. Try /help to see available commands.`);
+    return;
+  }
+
+  const stats = getBotStats();
+  const counts = getCommandCounts();
+  const uptime = process.uptime();
+  const uptimeHours = Math.floor(uptime / 3600);
+  const uptimeMinutes = Math.floor((uptime % 3600) / 60);
+
+  const message = `
+📊 <b>Bot Stats</b>
+
+<b>Users</b>
+• Total: ${stats.totalUsers}
+• Oura connected: ${stats.connectedUsers}
+• Used /drink: ${stats.drinkUsers}
+• Today new: ${stats.todayNewUsers}
+
+<b>Commands (since restart)</b>
+• /workout: ${counts.workout}
+• /drink: ${counts.drink}
+• /why: ${counts.why}
+• /demo: ${counts.demo}
+• /drinkdemo: ${counts.drinkdemo}
+• /whydemo: ${counts.whydemo}
+
+<b>Server</b>
+• Uptime: ${uptimeHours}h ${uptimeMinutes}m
+`.trim();
+
+  await reply(ctx, message);
+}
+
+// /why command - explain why you feel a certain way
+export async function handleWhy(ctx: Context) {
+  const telegramId = ctx.from?.id;
+  if (!telegramId) return;
+
+  incrementCommandCount("why");
+  console.log(`📊 /why from ${telegramId}`);
+
+  const token = getOuraToken(telegramId);
+
+  if (!token) {
+    await reply(ctx, MESSAGES.notConnected);
+    return;
+  }
+
+  // Parse user input: /why tired 5, /why mood, /why 3, etc.
+  const text = ctx.message?.text || "";
+  const userInput = parseWhyInput(text);
+
+  await ctx.reply("🔄 Analyzing your data...");
+
+  try {
+    const data = await fetchBiometricData(token);
+    const decision = getWhyDecision(data, userInput);
+    const message = formatWhyTelegram(decision, userInput);
+
+    updateLastCheck(telegramId);
+    await reply(ctx, message);
+  } catch (error) {
+    console.error("Why check error:", error);
+    await reply(ctx, MESSAGES.fetchError);
+  }
+}
+
+// /why demo - try with demo data
+export async function handleWhyDemo(ctx: Context) {
+  const telegramId = ctx.from?.id;
+  if (telegramId) {
+    setUser(telegramId, {});
+  }
+
+  incrementCommandCount("whydemo");
+  console.log(`📊 /whydemo from ${telegramId}`);
+
+  // Parse user input
+  const text = ctx.message?.text || "";
+  const userInput = parseWhyInput(text.replace(/^\/whydemo/i, "/why"));
+
+  await ctx.reply("🎲 Generating random scenario...");
+
+  const data = getRandomDemoData();
+  const decision = getWhyDecision(data, userInput);
+  const message = formatWhyTelegram(decision, userInput);
 
   const demoNote = `\n\n<i>📝 This is demo data. Use /connect to see your real Oura data.</i>`;
 

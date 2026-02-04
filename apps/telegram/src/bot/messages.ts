@@ -6,6 +6,7 @@ I help you make better decisions based on your Oura Ring data.
 <b>What I can do:</b>
 🏋️ /workout - Should I train today?
 🍺 /drink - How much can I drink tonight?
+🧠 /why - Why do I feel this way?
 
 <b>Quick Start:</b>
 1. Get your Oura Personal Access Token
@@ -15,6 +16,7 @@ I help you make better decisions based on your Oura Ring data.
 <b>Commands:</b>
 /workout - Training recommendation
 /drink - Drinking limit guide
+/why - Mind vs Body analysis
 /connect - Link your Oura Ring
 /demo - Try with sample data
 /help - Show all commands`,
@@ -32,6 +34,13 @@ I help you make better decisions based on your Oura Ring data.
 /drink history - See your drinking patterns
 /drink social - Social event strategy
 
+🧠 <b>Why (Mind vs Body)</b>
+/why - Why do I feel off today?
+/why tired 4 - With keyword + score (1-10)
+/why mood - Check mood category
+/why energy 3 - Check energy with score
+/why focus - Check focus/concentration
+
 🔗 <b>Connection</b>
 /connect TOKEN - Link your Oura Ring
 /status - Check connection status
@@ -40,6 +49,7 @@ I help you make better decisions based on your Oura Ring data.
 🎮 <b>Demo</b>
 /demo - Try workout with sample data
 /drinkdemo - Try drink with sample data
+/whydemo - Try why with sample data
 
 ❓ <b>Help</b>
 /help - Show this message

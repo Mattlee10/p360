@@ -77,3 +77,47 @@ export function addDrinkLog(telegramId: number, amount: number): DrinkLog {
 export function getDrinkLogs(telegramId: number): DrinkLog[] {
   return users.get(telegramId)?.drinkLogs || [];
 }
+
+// Stats functions
+export interface BotStats {
+  totalUsers: number;
+  connectedUsers: number;
+  drinkUsers: number;
+  workoutChecks: number;
+  drinkChecks: number;
+  whyChecks: number;
+  todayNewUsers: number;
+}
+
+// Command usage counters (in-memory, resets on restart)
+const commandCounts = {
+  workout: 0,
+  drink: 0,
+  demo: 0,
+  drinkdemo: 0,
+  why: 0,
+  whydemo: 0,
+};
+
+export function incrementCommandCount(command: keyof typeof commandCounts): void {
+  commandCounts[command]++;
+}
+
+export function getCommandCounts() {
+  return { ...commandCounts };
+}
+
+export function getBotStats(): BotStats {
+  const allUsers = getAllUsers();
+  const today = new Date().toISOString().split("T")[0];
+
+  return {
+    totalUsers: allUsers.length,
+    connectedUsers: allUsers.filter(u => u.ouraToken).length,
+    drinkUsers: allUsers.filter(u => u.drinkLogs && u.drinkLogs.length > 0).length,
+    workoutChecks: commandCounts.workout + commandCounts.demo,
+    drinkChecks: commandCounts.drink + commandCounts.drinkdemo,
+    whyChecks: commandCounts.why + commandCounts.whydemo,
+    todayNewUsers: allUsers.filter(u => u.createdAt.toISOString().split("T")[0] === today).length,
+  };
+}

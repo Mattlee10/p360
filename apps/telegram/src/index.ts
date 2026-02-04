@@ -12,6 +12,9 @@ import {
   handleFeedback,
   handleDrink,
   handleDrinkDemo,
+  handleWhy,
+  handleWhyDemo,
+  handleStats,
   handleUnknown,
 } from "./bot/handlers";
 
@@ -49,6 +52,9 @@ bot.command("feedback", handleFeedback);
 bot.command("drink", handleDrink);
 bot.command("d", handleDrink); // shortcut
 bot.command("drinkdemo", handleDrinkDemo);
+bot.command("why", handleWhy);
+bot.command("whydemo", handleWhyDemo);
+bot.command("stats", handleStats); // admin only
 
 // Handle unknown commands
 bot.on("message:text", (ctx) => {
@@ -79,6 +85,8 @@ bot.start({
     console.log("  /drink log N      - Log drinks (e.g. /drink log 3)");
     console.log("  /drink history    - See your drinking patterns");
     console.log("  /drink social     - Social event strategy");
+    console.log("  /why              - Mind vs Body analysis");
+    console.log("  /why tired 4      - With keyword + score");
     console.log("  /connect          - Link Oura Ring");
     console.log("  /demo             - Try with demo data");
     console.log("  /help             - Show all commands");
