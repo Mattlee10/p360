@@ -22,7 +22,10 @@ async function fetchOuraData(token: string): Promise<BiometricData> {
   );
 
   if (!readinessRes.ok) {
-    throw new Error(`Oura API error: ${readinessRes.status}`);
+    if (readinessRes.status === 401) {
+      throw new Error("Invalid Oura token. Please check your token and try again.");
+    }
+    throw new Error(`Oura API error: ${readinessRes.status}. Please try again later.`);
   }
 
   const readinessData: OuraReadinessData = await readinessRes.json();
@@ -39,7 +42,10 @@ async function fetchOuraData(token: string): Promise<BiometricData> {
   );
 
   if (!sleepRes.ok) {
-    throw new Error(`Oura API error: ${sleepRes.status}`);
+    if (sleepRes.status === 401) {
+      throw new Error("Invalid Oura token. Please check your token and try again.");
+    }
+    throw new Error(`Oura API error: ${sleepRes.status}. Please try again later.`);
   }
 
   const sleepData: OuraSleepData = await sleepRes.json();
@@ -61,6 +67,20 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const token = searchParams.get("token");
+    const isDemo = searchParams.get("demo") === "true";
+
+    // Demo mode - use fake data
+    if (isDemo) {
+      const demoBiometricData: BiometricData = {
+        date: new Date().toISOString().split("T")[0],
+        readinessScore: 85,
+        sleepScore: 81,
+        hrvBalance: 82,
+        restingHR: 55,
+      };
+      const decision = getWorkoutDecision(demoBiometricData);
+      return NextResponse.json(decision);
+    }
 
     if (!token) {
       return NextResponse.json(

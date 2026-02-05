@@ -16,6 +16,11 @@ export default function Home() {
     router.push(`/result?token=${encodeURIComponent(token)}`);
   };
 
+  const handleDemo = () => {
+    setLoading(true);
+    router.push('/result?demo=true');
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="max-w-md w-full space-y-8">
@@ -65,6 +70,15 @@ export default function Home() {
             {loading ? "Checking..." : "Check Now"}
           </button>
         </form>
+
+        {/* Demo Button */}
+        <button
+          onClick={handleDemo}
+          disabled={loading}
+          className="w-full py-2 px-4 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:cursor-not-allowed text-slate-300 text-sm rounded-lg transition-colors"
+        >
+          Try Demo (no token needed)
+        </button>
 
         {/* Info */}
         <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">

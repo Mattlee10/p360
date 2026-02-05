@@ -68,12 +68,20 @@ function ResultContent() {
         <div className="max-w-md w-full bg-red-900/20 border border-red-800 rounded-lg p-6 text-center">
           <h2 className="text-xl font-bold text-red-400 mb-2">Error</h2>
           <p className="text-red-300 mb-4">{error}</p>
-          <Link
-            href="/"
-            className="inline-block px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-          >
-            Try Again
-          </Link>
+          <div className="flex gap-3 justify-center">
+            <Link
+              href="/"
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+            >
+              Try Again
+            </Link>
+            <Link
+              href="/result?demo=true"
+              className="px-4 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-lg transition-colors"
+            >
+              Try Demo
+            </Link>
+          </div>
         </div>
       </div>
     );
