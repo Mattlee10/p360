@@ -1,0 +1,23 @@
+{
+  "name": "p360-discord",
+  "version": "0.1.0",
+  "description": "P360 Discord Bot - Bio-data driven decision support",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "deploy": "tsx src/commands/deploy.ts"
+  },
+  "dependencies": {
+    "@p360/core": "file:../../packages/core",
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  }
+}

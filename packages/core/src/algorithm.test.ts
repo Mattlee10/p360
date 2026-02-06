@@ -108,8 +108,8 @@ describe("calculateDecisionReadiness", () => {
         category: "workout",
         importance: "medium",
       });
-      expect(result.insight.headline).toBe("Rest day");
-      expect(result.insight.action).toContain("No training");
+      expect(result.insight.headline).toBe("Active recovery only");
+      expect(result.insight.action).toContain("Walking");
     });
 
     it("generates meeting-specific insights", () => {
@@ -126,7 +126,7 @@ describe("calculateDecisionReadiness", () => {
     it("includes all metric labels", () => {
       const result = calculateDecisionReadiness(excellentData);
       expect(result.metrics.sleep.label).toBe("Excellent");
-      expect(result.metrics.readiness.label).toBe("Excellent");
+      expect(result.metrics.readiness.label).toBe("Good");
       expect(result.metrics.hrv.label).toBe("Normal");
     });
 

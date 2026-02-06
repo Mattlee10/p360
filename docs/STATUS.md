@@ -49,6 +49,27 @@
 
 ---
 
+## Research Round 6 (2026-02-06)
+
+### 신규 Pain Points 발견 (3개)
+| ID | Pain Point | 강도 | P360 연결 |
+|----|-----------|------|----------|
+| P26 | 오버트레이닝 면역 붕괴 | High | `/workout` 확장 |
+| P27 | 알코올/카페인 회복 비용 인식 부재 | **Critical** | `/drink` 직결 |
+| P28 | 라이프 전환 퍼포먼스 충격 (30대 아빠) | High | Phase 2 세그먼트 |
+
+### 핵심 인사이트
+- **P27이 가장 강한 GTM hook**: "맥주 2잔 = 회복 3일" — 구체적, 수치적, 기존 `/drink` 기능과 직결
+- 총 28개 pain points → 4가지 Root Problem으로 수렴 (Trust Gap, Timing Blindness, Context Void, Attribution Error)
+- r/Biohackers 700k+ 커뮤니티에서 "하이퍼포머 번아웃" 관련 높은 engagement 확인 (47~91 comments)
+
+### 즉시 활용 가능 (기존 기능 확장)
+1. `/drink` → 회복 비용 시뮬레이션 추가 (P27)
+2. `/workout` → 오버트레이닝 누적 경고 추가 (P26)
+3. `/why` → "라이프 전환기" 맥락 인식 추가 (P28, Phase 2)
+
+---
+
 ## Immediate Priorities (This Week)
 
 ### Priority 1: Telegram User Feedback Loop
