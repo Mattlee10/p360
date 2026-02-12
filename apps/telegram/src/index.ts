@@ -18,6 +18,8 @@ import {
   handleMoodDemo,
   handleCost,
   handleCostDemo,
+  handleAsk,
+  handleAskDemo,
   handleStats,
   handleUnknown,
 } from "./bot/handlers";
@@ -64,6 +66,8 @@ bot.command("mooddemo", handleMoodDemo);
 bot.command("cost", handleCost);
 bot.command("c", handleCost); // shortcut
 bot.command("costdemo", handleCostDemo);
+bot.command("ask", handleAsk);
+bot.command("askdemo", handleAskDemo);
 bot.command("stats", handleStats); // admin only
 
 // Handle unknown commands
@@ -101,6 +105,7 @@ bot.start({
     console.log("  /mood history     - See mood-recovery patterns");
     console.log("  /cost beer 3      - Recovery cost simulator");
     console.log("  /cost coffee 2    - Caffeine sleep impact");
+    console.log("  /ask <question>   - Ask anything (AI-powered)");
     console.log("  /connect          - Link Oura/WHOOP");
     console.log("  /demo             - Try with demo data");
     console.log("  /help             - Show all commands");

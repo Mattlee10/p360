@@ -56,6 +56,7 @@ import {
   getSubstanceList,
   formatCostTelegram,
 } from "../lib/cost";
+import { getAskResponse, isAskAvailable } from "../lib/ask";
 
 // Helper to send HTML messages
 async function reply(ctx: Context, text: string) {
@@ -779,6 +780,99 @@ export async function handleCostDemo(ctx: Context) {
   const demoNote = `\n\n<i>📝 This is demo data. Use /connect to see your real data.\nTry: /costdemo coffee 3, /costdemo wine 2</i>`;
 
   await reply(ctx, message + demoNote);
+}
+
+// ============================================
+// Ask Command (AI-powered contextual nudges)
+// ============================================
+
+// /ask command - natural language question
+// Usage: /ask 회식인데 소주 몇 잔까지 괜찮아?
+export async function handleAsk(ctx: Context) {
+  const telegramId = ctx.from?.id;
+  if (!telegramId) return;
+
+  incrementCommandCount("ask");
+  console.log(`📊 /ask from ${telegramId}`);
+
+  if (!isAskAvailable()) {
+    await reply(ctx, "⚠️ <b>Ask feature not configured</b>\n\nServer admin needs to set ANTHROPIC_API_KEY.");
+    return;
+  }
+
+  if (!hasConnectedDevice(telegramId)) {
+    await reply(ctx, MESSAGES.notConnected);
+    return;
+  }
+
+  const text = ctx.message?.text || "";
+  const question = text.replace(/^\/ask\s*/i, "").trim();
+
+  if (!question) {
+    await reply(
+      ctx,
+      `💬 <b>Ask P360 Anything</b>
+
+Ask about your body state in any language.
+
+<b>Examples:</b>
+<code>/ask 회식인데 소주 몇 잔까지 괜찮아?</code>
+<code>/ask should I work out today?</code>
+<code>/ask 커피 지금 마셔도 되나?</code>
+<code>/ask I'm tired but need to keep working</code>
+
+<b>Demo:</b> /askdemo 오늘 운동해도 돼?`
+    );
+    return;
+  }
+
+  await ctx.reply("🔄 Analyzing your data...");
+
+  try {
+    const data = await getUserBiometricData(telegramId);
+    if (!data) {
+      await reply(ctx, MESSAGES.fetchError);
+      return;
+    }
+
+    const message = await getAskResponse(question, data);
+    updateLastCheck(telegramId);
+    await reply(ctx, message);
+  } catch (error) {
+    console.error("Ask error:", error);
+    await reply(ctx, "❌ Error processing your question. Try again.");
+  }
+}
+
+// /askdemo - try ask with demo data
+export async function handleAskDemo(ctx: Context) {
+  const telegramId = ctx.from?.id;
+  if (telegramId) {
+    setUser(telegramId, {});
+  }
+
+  incrementCommandCount("askdemo");
+  console.log(`📊 /askdemo from ${telegramId}`);
+
+  if (!isAskAvailable()) {
+    await reply(ctx, "⚠️ <b>Ask feature not configured</b>\n\nServer admin needs to set ANTHROPIC_API_KEY.");
+    return;
+  }
+
+  const text = ctx.message?.text || "";
+  const question = text.replace(/^\/askdemo\s*/i, "").trim() || "오늘 운동해도 돼?";
+
+  await ctx.reply("🎲 Generating with demo data...");
+
+  try {
+    const data = getRandomDemoData();
+    const message = await getAskResponse(question, data);
+    const demoNote = `\n\n<i>📝 This is demo data. Use /connect to see your real data.</i>`;
+    await reply(ctx, message + demoNote);
+  } catch (error) {
+    console.error("Ask demo error:", error);
+    await reply(ctx, "❌ Error processing your question. Try again.");
+  }
 }
 
 // Handle unknown commands

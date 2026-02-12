@@ -137,6 +137,16 @@ const commands = [
     ),
 
   new SlashCommandBuilder()
+    .setName("ask")
+    .setDescription("Ask anything about your body state (AI-powered)")
+    .addStringOption((option) =>
+      option
+        .setName("question")
+        .setDescription("Your question in any language")
+        .setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
     .setName("demo")
     .setDescription("Try P360 with demo data")
     .addStringOption((option) =>

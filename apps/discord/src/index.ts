@@ -51,6 +51,7 @@ import {
   formatDrinkHistoryEmbed,
   formatCostEmbed,
 } from "./lib/format";
+import { getAskEmbed, isAskAvailable } from "./lib/ask";
 
 dotenv.config();
 
@@ -487,13 +488,51 @@ async function handleCost(interaction: ChatInputCommandInteraction) {
 }
 
 // ============================================
+// Ask Handler (AI-powered contextual nudges)
+// ============================================
+
+async function handleAsk(interaction: ChatInputCommandInteraction) {
+  const userId = interaction.user.id;
+  const question = interaction.options.getString("question", true);
+
+  if (!isAskAvailable()) {
+    await interaction.reply({
+      content: "⚠️ Ask feature not configured. Server admin needs to set ANTHROPIC_API_KEY.",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  if (!hasConnectedDevice(userId)) {
+    await interaction.reply({ embeds: [notConnectedEmbed()], ephemeral: true });
+    return;
+  }
+
+  await interaction.deferReply();
+
+  try {
+    const data = await getUserBiometricData(userId);
+    if (!data) {
+      await interaction.editReply({ embeds: [notConnectedEmbed()] });
+      return;
+    }
+    const embed = await getAskEmbed(question, data);
+    updateLastCheck(userId);
+    await interaction.editReply({ embeds: [embed] });
+  } catch (error) {
+    console.error("Ask error:", error);
+    await interaction.editReply("❌ Error processing your question. Try again.");
+  }
+}
+
+// ============================================
 // Event Handlers
 // ============================================
 
 client.once("ready", (c) => {
   console.log(`✅ Discord bot ready: ${c.user.tag}`);
   console.log("");
-  console.log("Commands: /workout, /drink, /cost, /why, /mood, /connect, /demo");
+  console.log("Commands: /workout, /drink, /cost, /why, /mood, /ask, /connect, /demo");
   console.log("");
 });
 
@@ -527,6 +566,9 @@ client.on("interactionCreate", async (interaction) => {
         break;
       case "cost":
         await handleCost(interaction);
+        break;
+      case "ask":
+        await handleAsk(interaction);
         break;
       case "demo":
         await handleDemo(interaction);

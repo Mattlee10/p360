@@ -1,6 +1,6 @@
 import * as http from "http";
 import * as crypto from "crypto";
-import { setOuraTokens, getConfigPath } from "../lib/config";
+import { setOuraTokens, setAnthropicApiKey, getConfigPath } from "../lib/config";
 
 // Oura OAuth config - use environment variables
 const OURA_CLIENT_ID = process.env.OURA_CLIENT_ID || "";
@@ -191,6 +191,33 @@ async function exchangeToken(code: string, codeVerifier: string): Promise<void> 
   console.log(`  Config saved at: ${getConfigPath()}`);
   console.log("");
 }
+
+// ============================================
+// Anthropic API Key Login
+// ============================================
+
+export function loginWithAnthropicKey(key: string): void {
+  if (!key || !key.startsWith("sk-ant-")) {
+    console.log("");
+    console.log("  ⚠️  Invalid key format. Anthropic keys start with 'sk-ant-'");
+    console.log("");
+    return;
+  }
+
+  setAnthropicApiKey(key);
+  console.log("");
+  console.log("  ✅ Anthropic API key saved!");
+  console.log("");
+  console.log("  You can now run:");
+  console.log("     p360 ask \"should I work out today?\"");
+  console.log("");
+  console.log(`  Config saved at: ${getConfigPath()}`);
+  console.log("");
+}
+
+// ============================================
+// Oura Token Login
+// ============================================
 
 interface LoginTokenOptions {
   token?: string;

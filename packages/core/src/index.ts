@@ -145,6 +145,21 @@ export {
 } from "./cost";
 
 // ============================================
+// Advisor (AI-powered contextual nudges)
+// ============================================
+
+export type {
+  NudgeOption,
+  NudgeResponse,
+  AdvisorContext,
+} from "./advisor";
+
+export {
+  buildAdvisorContext,
+  buildSystemPrompt,
+} from "./advisor";
+
+// ============================================
 // Demo Data
 // ============================================
 

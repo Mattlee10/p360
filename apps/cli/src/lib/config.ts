@@ -1,14 +1,36 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { OuraTokens } from "./types";
+import type { DrinkLog, MoodEntry } from "@p360/core";
 
 const CONFIG_DIR = path.join(os.homedir(), ".p360");
 const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
 
+export interface OuraTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+}
+
+interface StoredDrinkLog {
+  date: string;
+  amount: number;
+  timestamp: string;
+}
+
+interface StoredMoodEntry {
+  date: string;
+  score: number;
+  timestamp: string;
+  note?: string;
+}
+
 interface Config {
   ouraTokens?: OuraTokens;
   userId?: string;
+  drinkHistory?: StoredDrinkLog[];
+  moodHistory?: StoredMoodEntry[];
+  anthropicApiKey?: string;
 }
 
 function ensureConfigDir(): void {
@@ -34,6 +56,10 @@ function writeConfig(config: Config): void {
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
 }
 
+// ============================================
+// Oura Tokens
+// ============================================
+
 export function getOuraTokens(): OuraTokens | undefined {
   return readConfig().ouraTokens;
 }
@@ -57,4 +83,75 @@ export function isLoggedIn(): boolean {
 
 export function getConfigPath(): string {
   return CONFIG_FILE;
+}
+
+// ============================================
+// Drink History
+// ============================================
+
+export function getDrinkHistory(): DrinkLog[] {
+  const config = readConfig();
+  return (config.drinkHistory || []).map((log) => ({
+    ...log,
+    timestamp: new Date(log.timestamp),
+  }));
+}
+
+export function addDrinkLog(log: DrinkLog): void {
+  const config = readConfig();
+  if (!config.drinkHistory) {
+    config.drinkHistory = [];
+  }
+  config.drinkHistory.push({
+    date: log.date,
+    amount: log.amount,
+    timestamp: log.timestamp.toISOString(),
+  });
+  // Keep last 90 days
+  const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  config.drinkHistory = config.drinkHistory.filter((l) => l.timestamp >= cutoff);
+  writeConfig(config);
+}
+
+// ============================================
+// Mood History
+// ============================================
+
+export function getMoodHistory(): MoodEntry[] {
+  const config = readConfig();
+  return (config.moodHistory || []).map((entry) => ({
+    ...entry,
+    timestamp: new Date(entry.timestamp),
+  }));
+}
+
+export function addMoodEntry(entry: MoodEntry): void {
+  const config = readConfig();
+  if (!config.moodHistory) {
+    config.moodHistory = [];
+  }
+  config.moodHistory.push({
+    date: entry.date,
+    score: entry.score,
+    timestamp: entry.timestamp.toISOString(),
+    note: entry.note,
+  });
+  // Keep last 90 days
+  const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+  config.moodHistory = config.moodHistory.filter((e) => e.timestamp >= cutoff);
+  writeConfig(config);
+}
+
+// ============================================
+// Anthropic API Key
+// ============================================
+
+export function getAnthropicApiKey(): string | undefined {
+  return process.env.ANTHROPIC_API_KEY || readConfig().anthropicApiKey;
+}
+
+export function setAnthropicApiKey(key: string): void {
+  const config = readConfig();
+  config.anthropicApiKey = key;
+  writeConfig(config);
 }

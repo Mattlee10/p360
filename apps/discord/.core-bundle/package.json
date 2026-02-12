@@ -1,0 +1,14 @@
+{
+  "name": "@p360/core",
+  "version": "0.1.0",
+  "main": "out/index.js",
+  "module": "out/index.mjs",
+  "types": "out/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./out/index.mjs",
+      "require": "./out/index.js",
+      "types": "./out/index.d.ts"
+    }
+  }
+}

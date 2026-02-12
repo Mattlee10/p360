@@ -2,34 +2,111 @@
 
 import { Command } from "commander";
 import { workoutCommand } from "./commands/workout";
-import { loginCommand, loginWithToken } from "./commands/login";
+import { loginCommand, loginWithToken, loginWithAnthropicKey } from "./commands/login";
 import { statusCommand } from "./commands/status";
+import { checkCommand } from "./commands/check";
+import { drinkCommand, drinkLogCommand, drinkSocialCommand } from "./commands/drink";
+import { whyCommand } from "./commands/why";
+import { moodCommand } from "./commands/mood";
+import { costCommand } from "./commands/cost";
+import { askCommand } from "./commands/ask";
 
 const program = new Command();
 
 program
   .name("p360")
-  .description("CLI tool that tells you if you should work out today based on your Oura data")
-  .version("0.1.0");
+  .description("Biometric-driven decision support for high-performers")
+  .version("0.2.0");
 
-// Main workout command
+// Check command (default)
+program
+  .command("check")
+  .alias("c")
+  .description("Check your decision readiness")
+  .option("-j, --json", "Output as JSON")
+  .option("-d, --demo", "Use demo data")
+  .option("--category <category>", "Decision category (email, meeting, financial, workout, creative, negotiation)")
+  .option("--importance <level>", "Importance level (low, medium, high, critical)")
+  .action(checkCommand);
+
+// Workout command
 program
   .command("workout")
   .alias("w")
-  .description("Check if you should work out today")
+  .description("Should you work out today?")
   .option("-j, --json", "Output as JSON")
-  .option("-c, --compact", "Output in compact format")
-  .option("-d, --demo", "Use demo data (no Oura connection needed)")
-  .option("-s, --sport <sport>", "Get sport-specific guidance (e.g., basketball, running, cycling)")
+  .option("-d, --demo", "Use demo data")
+  .option("-s, --sport <sport>", "Sport-specific guidance (e.g., basketball, running)")
   .action(workoutCommand);
+
+// Drink command
+const drink = program
+  .command("drink")
+  .description("Alcohol decision support");
+
+drink
+  .command("check", { isDefault: true })
+  .description("Should you drink tonight?")
+  .option("-j, --json", "Output as JSON")
+  .option("-d, --demo", "Use demo data")
+  .action(drinkCommand);
+
+drink
+  .command("log <amount>")
+  .description("Log drinks (e.g., p360 drink log 2)")
+  .action(drinkLogCommand);
+
+drink
+  .command("social")
+  .description("Get social event strategy")
+  .option("-d, --demo", "Use demo data")
+  .action(drinkSocialCommand);
+
+// Why command
+program
+  .command("why [keyword]")
+  .description("Why do I feel this way? (e.g., p360 why tired -s 3)")
+  .option("-j, --json", "Output as JSON")
+  .option("-d, --demo", "Use demo data")
+  .option("-s, --score <score>", "Your subjective feeling (1-10)")
+  .action(whyCommand);
+
+// Mood command
+program
+  .command("mood [score]")
+  .description("Log mood (1-5) and see body correlation")
+  .option("-j, --json", "Output as JSON")
+  .option("-d, --demo", "Use demo data")
+  .option("-n, --note <note>", "Add a note")
+  .action(moodCommand);
+
+// Cost command
+program
+  .command("cost [substance] [amount]")
+  .description("Recovery cost simulator (e.g., p360 cost beer 3)")
+  .option("-j, --json", "Output as JSON")
+  .option("-d, --demo", "Use demo data")
+  .action(costCommand);
+
+// Ask command (AI-powered)
+program
+  .command("ask <question>")
+  .alias("a")
+  .description("Ask anything about your body state (AI-powered)")
+  .option("-j, --json", "Output as JSON")
+  .option("-d, --demo", "Use demo data")
+  .action(askCommand);
 
 // Login command
 program
   .command("login")
-  .description("Connect your Oura Ring")
+  .description("Connect your Oura Ring or Anthropic API")
   .option("-t, --token <token>", "Personal Access Token from Oura")
+  .option("--anthropic <key>", "Anthropic API key for p360 ask")
   .action((options) => {
-    if (options.token) {
+    if (options.anthropic) {
+      loginWithAnthropicKey(options.anthropic);
+    } else if (options.token) {
       loginWithToken(options);
     } else {
       loginCommand();
@@ -43,9 +120,9 @@ program
   .description("Show connection status and latest data")
   .action(statusCommand);
 
-// Default to workout if no command specified
+// Default to check if no command specified
 program.action(() => {
-  workoutCommand({});
+  checkCommand({ demo: false });
 });
 
 program.parse();

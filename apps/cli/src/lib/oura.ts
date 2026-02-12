@@ -1,9 +1,6 @@
 import { getOuraTokens, setOuraTokens } from "./config";
-import {
-  BiometricData,
-  OuraDailySleep,
-  OuraDailyReadiness,
-} from "./types";
+import type { BiometricData, OuraDailySleep, OuraDailyReadiness } from "@p360/core";
+import { getRandomDemoData as coreGetRandomDemoData } from "@p360/core";
 
 const OURA_API_BASE = "https://api.ouraring.com/v2";
 const OURA_TOKEN_URL = "https://api.ouraring.com/oauth/token";
@@ -187,25 +184,6 @@ export function getDemoData(): BiometricData {
   return DEMO_DATA;
 }
 
-// Generate random demo data for testing
 export function getRandomDemoData(): BiometricData {
-  const scenarios = [
-    // Great day
-    { sleepScore: 88, readinessScore: 85, hrvBalance: 65, restingHR: 52 },
-    // Good day
-    { sleepScore: 75, readinessScore: 72, hrvBalance: 55, restingHR: 55 },
-    // Moderate day
-    { sleepScore: 65, readinessScore: 58, hrvBalance: 45, restingHR: 58 },
-    // Rough day
-    { sleepScore: 55, readinessScore: 42, hrvBalance: 35, restingHR: 62 },
-    // Bad day
-    { sleepScore: 45, readinessScore: 28, hrvBalance: 25, restingHR: 68 },
-  ];
-
-  const scenario = scenarios[Math.floor(Math.random() * scenarios.length)];
-
-  return {
-    ...scenario,
-    date: new Date().toISOString().split("T")[0],
-  };
+  return coreGetRandomDemoData();
 }

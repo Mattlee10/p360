@@ -208,6 +208,8 @@ const commandCounts = {
   whydemo: 0,
   cost: 0,
   costdemo: 0,
+  ask: 0,
+  askdemo: 0,
 };
 
 export function incrementCommandCount(command: keyof typeof commandCounts): void {
