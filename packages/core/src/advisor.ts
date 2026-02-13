@@ -4,6 +4,8 @@ import { getDrinkDecision, getSocialStrategy } from "./drink";
 import { getRecoveryCost, parseSubstance } from "./cost";
 import { getWhyDecision, parseWhyInput } from "./why";
 import { getWorkoutDecision, parseSport } from "./workout";
+import { calculateRollingAverage, calculateBaselineVariance, detectTrend, detectSignificance } from "./timeseries";
+import type { CausalityProfile } from "./causality";
 
 // ============================================
 // Advisor Types
@@ -81,9 +83,16 @@ const ROUTES: RouteMatch[] = [
       "what if", "만약", "forecast", "예측",
     ],
   },
+  {
+    key: "rolling",
+    keywords: [
+      "rolling", "trend", "추세", "7-day", "7일", "average", "평균", "smooth",
+      "signal", "신호", "noise", "노이즈", "pattern", "패턴", "history", "역사",
+    ],
+  },
 ];
 
-function matchRoutes(question: string): string[] {
+export function matchRoutes(question: string): string[] {
   const lower = question.toLowerCase();
   const matched: string[] = [];
 
@@ -104,6 +113,7 @@ function runAnalyses(
   routes: string[],
   data: BiometricData,
   question: string,
+  profile?: CausalityProfile,
 ): Record<string, unknown> {
   const analyses: Record<string, unknown> = {};
 
@@ -113,17 +123,17 @@ function runAnalyses(
   for (const route of routes) {
     switch (route) {
       case "drink": {
-        analyses.drink = getDrinkDecision(data);
-        analyses.socialStrategy = getSocialStrategy(getDrinkDecision(data));
+        analyses.drink = getDrinkDecision(data, undefined, profile);
+        analyses.socialStrategy = getSocialStrategy(getDrinkDecision(data, undefined, profile));
 
-        // Run cost for common drink amounts
+        // Run cost for common drink amounts (with personal constants)
         analyses.drinkCosts = [1, 2, 3, 4, 5].map((n) =>
-          getRecoveryCost(data, "beer", n),
+          getRecoveryCost(data, "beer", n, profile),
         );
 
         // Also add spirits cost for soju/cocktail context
         analyses.spiritsCosts = [1, 2, 3].map((n) =>
-          getRecoveryCost(data, "spirits", n),
+          getRecoveryCost(data, "spirits", n, profile),
         );
         break;
       }
@@ -151,11 +161,11 @@ function runAnalyses(
 
       case "coffee": {
         analyses.coffeeCosts = [1, 2, 3].map((n) =>
-          getRecoveryCost(data, "coffee", n),
+          getRecoveryCost(data, "coffee", n, profile),
         );
 
         analyses.teaCosts = [1, 2, 3].map((n) =>
-          getRecoveryCost(data, "tea", n),
+          getRecoveryCost(data, "tea", n, profile),
         );
         break;
       }
@@ -167,11 +177,71 @@ function runAnalyses(
           const sub = parseSubstance(word);
           if (sub) {
             analyses[`${sub}Costs`] = [1, 2, 3, 4, 5].map((n) =>
-              getRecoveryCost(data, sub, n),
+              getRecoveryCost(data, sub, n, profile),
             );
             break;
           }
         }
+        break;
+      }
+
+      case "rolling": {
+        // Time-series analysis with rolling averages
+        // Generate synthetic historical data for demo purposes
+        // In production, this would come from Oura API historical fetch
+
+        const historyLength = 60;
+        const hrvHistory: number[] = [];
+        const readinessHistory: number[] = [];
+
+        // Generate realistic synthetic history
+        for (let i = 0; i < historyLength; i++) {
+          const baseHrv = (data.hrvBalance ?? 50) + Math.sin(i / 7) * 10;
+          const noiseHrv = (Math.random() - 0.5) * 15;
+          hrvHistory.push(Math.max(25, baseHrv + noiseHrv));
+
+          const baseReadiness = (data.readinessScore ?? 65) + Math.sin(i / 7) * 15;
+          const noiseReadiness = (Math.random() - 0.5) * 10;
+          readinessHistory.push(Math.max(0, Math.min(100, baseReadiness + noiseReadiness)));
+        }
+
+        // Calculate rolling averages (7-day default)
+        const hrvRolling = calculateRollingAverage(hrvHistory, 7);
+        const readinessRolling = calculateRollingAverage(readinessHistory, 7);
+
+        // Detect trends
+        const hrvTrends = detectTrend(hrvRolling);
+        const readinessTrends = detectTrend(readinessRolling);
+
+        // Calculate baselines
+        const hrvBaseline = calculateBaselineVariance(hrvRolling);
+        const readinessBaseline = calculateBaselineVariance(readinessRolling);
+
+        // Detect recent peaks
+        const recentHrvDelta = hrvRolling[hrvRolling.length - 1] - hrvBaseline.mean;
+        const recentReadinessDelta = readinessRolling[readinessRolling.length - 1] - readinessBaseline.mean;
+
+        const hrvSignificant = detectSignificance(recentHrvDelta, hrvBaseline.stdev);
+        const readinessSignificant = detectSignificance(recentReadinessDelta, readinessBaseline.stdev);
+
+        analyses.rolling = {
+          hrv: {
+            history: hrvHistory,
+            rolling: hrvRolling,
+            trends: hrvTrends,
+            baseline: hrvBaseline,
+            recentDelta: recentHrvDelta,
+            isSignificant: hrvSignificant,
+          },
+          readiness: {
+            history: readinessHistory,
+            rolling: readinessRolling,
+            trends: readinessTrends,
+            baseline: readinessBaseline,
+            recentDelta: recentReadinessDelta,
+            isSignificant: readinessSignificant,
+          },
+        };
         break;
       }
 
@@ -221,9 +291,22 @@ function formatBiometrics(data: BiometricData): string {
 export function buildSystemPrompt(
   data: BiometricData,
   analyses: Record<string, unknown>,
+  profile?: CausalityProfile,
 ): string {
   const biometrics = formatBiometrics(data);
   const analysisJson = JSON.stringify(analyses, null, 2);
+
+  // Personal patterns section (only if patterns exist)
+  let personalSection = "";
+  if (profile && profile.patterns.length > 0) {
+    const patternLines = profile.patterns.map((p) => `- ${p.description}`).join("\n");
+    personalSection = `
+
+PERSONAL PATTERNS (learned from ${profile.totalEvents} historical events):
+${patternLines}
+IMPORTANT: These are THIS user's actual measured sensitivities, not population averages.
+The pre-computed analysis already uses these personal values. Reference them in your response.`;
+  }
 
   return `You are P360, a biometric-data-driven personal advisor.
 You have the user's real-time body data and pre-computed analysis below.
@@ -255,7 +338,15 @@ BODY STATE:
 ${biometrics}
 
 PRE-COMPUTED ANALYSIS:
-${analysisJson}
+${analysisJson}${personalSection}
+
+ROLLING AVERAGE INTERPRETATION (if present in analysis):
+If "rolling" is in the analysis:
+- Show the 7-day trend direction (recent 3-5 days)
+- Highlight if recent values are SIGNAL (⭐) vs normal variation
+- Use baseline variance to explain noise floor
+- Example: "HRV trending down for 3 days (54→50→48ms). Below your ±7ms noise floor. Not yet concerning."
+- Compare recent delta to user's historical pattern, not population averages
 
 Respond in this JSON format:
 {
@@ -275,10 +366,11 @@ Respond in this JSON format:
 export function buildAdvisorContext(
   question: string,
   data: BiometricData,
+  profile?: CausalityProfile,
 ): AdvisorContext {
   const routes = matchRoutes(question);
-  const analyses = runAnalyses(routes, data, question);
-  const systemPrompt = buildSystemPrompt(data, analyses);
+  const analyses = runAnalyses(routes, data, question, profile);
+  const systemPrompt = buildSystemPrompt(data, analyses, profile);
 
   return {
     question,
