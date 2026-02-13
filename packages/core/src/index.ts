@@ -157,7 +157,93 @@ export type {
 export {
   buildAdvisorContext,
   buildSystemPrompt,
+  matchRoutes,
 } from "./advisor";
+
+// ============================================
+// Causality Engine (개인별 인과관계 독점 자산)
+// ============================================
+
+export type {
+  CausalityDomain,
+  CausalityAction,
+  CausalityRecommendation,
+  CausalityEvent,
+  CausalityOutcome,
+  BiometricSnapshot,
+  PersonalPattern,
+  PersonalConstants,
+  CausalityProfile,
+  EventStore,
+} from "./causality";
+
+export {
+  toBiometricSnapshot,
+  calculateDelta,
+} from "./causality";
+
+export {
+  InMemoryEventStore,
+  extractEventFromAsk,
+  resolveOutcomes,
+} from "./causality-collector";
+
+export {
+  linearRegression,
+  analyzeAlcoholSensitivity,
+  analyzeAlcoholRecovery,
+  analyzeCaffeineSensitivity,
+  analyzeWorkoutRecovery,
+  analyzePersonalDrinkLimit,
+  buildCausalityProfile,
+} from "./causality-analyzer";
+
+export type { RegressionResult } from "./causality-analyzer";
+
+// ============================================
+// Ask Gateway (unified ask pipeline)
+// ============================================
+
+export type {
+  AskRequest,
+  AskPrepared,
+  AskResult,
+} from "./ask-gateway";
+
+export {
+  prepareAsk,
+  processAskResponse,
+  parseNudgeResponse,
+  getNudgeVerdictEmoji,
+  getNudgeVerdictColor,
+} from "./ask-gateway";
+
+// ============================================
+// Time-Series Analysis
+// ============================================
+
+export type { TimesSeriesPeakValley } from "./timeseries";
+
+export {
+  calculateRollingAverage,
+  calculateBaselineVariance,
+  detectSignificance,
+  detectTrend,
+  calculatePercentChange,
+  findPeaksAndValleys,
+} from "./timeseries";
+
+// ============================================
+// Confound Filtering
+// ============================================
+
+export type { ConfoundFlags, ConfoundAdjustment } from "./confound-filter";
+
+export {
+  applyConfoundAdjustment,
+  applyConfoundFiltering,
+  estimateConfoundPenalty,
+} from "./confound-filter";
 
 // ============================================
 // Demo Data

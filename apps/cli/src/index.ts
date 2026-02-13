@@ -10,6 +10,7 @@ import { whyCommand } from "./commands/why";
 import { moodCommand } from "./commands/mood";
 import { costCommand } from "./commands/cost";
 import { askCommand } from "./commands/ask";
+import { analyzeCommand } from "./commands/analyze";
 
 const program = new Command();
 
@@ -96,6 +97,28 @@ program
   .option("-j, --json", "Output as JSON")
   .option("-d, --demo", "Use demo data")
   .action(askCommand);
+
+// Analyze command (time-series analysis)
+program
+  .command("analyze [metric]")
+  .description("Time-series analysis with rolling averages and confound filtering")
+  .option("-r, --rolling <days>", "Rolling window size (default: 7)", "7")
+  .option("--days <days>", "Lookback period in days (default: 30)", "30")
+  .option("--exclude <confounds>", "Exclude confounds (comma-separated: training,travel,alcohol)")
+  .option("--baseline <days>", "Baseline window for variance (default: 30)", "30")
+  .option("-j, --json", "Output as JSON")
+  .option("-d, --demo", "Use demo data")
+  .action((metric, options) => {
+    analyzeCommand(metric ? [metric] : [], {
+      metric: metric || "hrv",
+      rolling: parseInt(options.rolling),
+      days: parseInt(options.days),
+      exclude: options.exclude,
+      baseline: parseInt(options.baseline),
+      json: options.json,
+      demo: options.demo,
+    });
+  });
 
 // Login command
 program
