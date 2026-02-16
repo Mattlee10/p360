@@ -5,6 +5,7 @@ import {
   EmbedBuilder,
 } from "discord.js";
 import * as dotenv from "dotenv";
+import cron from "node-cron";
 import {
   getWorkoutDecision,
   getDrinkDecision,
@@ -20,6 +21,9 @@ import {
   parseWhyInput,
   ProviderType,
   SubstanceType,
+  resolveOutcomes,
+  createSupabaseProfileStore,
+  buildCausalityProfile,
 } from "@p360/core";
 import {
   fetchBiometricData,
@@ -52,7 +56,7 @@ import {
   formatCostEmbed,
 } from "./lib/format";
 import { getAskEmbed, isAskAvailable } from "./lib/ask";
-import { createSupabaseEventStore } from "@p360/core";
+import { createSupabaseEventStore, OuraProvider } from "@p360/core";
 
 dotenv.config();
 
@@ -593,6 +597,71 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 
+// ============================================
+// Cron Job: Daily Outcome Resolution (9 AM KST = 0 AM UTC)
+// ============================================
+
+function scheduleCronJobs() {
+  // Run every day at 00:00 UTC (09:00 KST)
+  cron.schedule("0 0 * * *", async () => {
+    console.log("[cron] Starting daily outcome resolution at", new Date().toISOString());
+
+    try {
+      if (!eventStore) {
+        console.log("[cron] Supabase not configured (missing SUPABASE_URL/SUPABASE_ANON_KEY)");
+        return;
+      }
+
+      const ouraToken = process.env.OURA_API_KEY;
+      if (!ouraToken) {
+        console.log("[cron] Oura API token not configured");
+        return;
+      }
+
+      const ouraProvider = new OuraProvider();
+      const userId = process.env.P360_USER_ID || "discord-default";
+
+      // Fetch today's biometric data from Oura
+      const data = await ouraProvider.fetchBiometricData(ouraToken);
+
+      if (!data) {
+        console.log("[cron] No biometric data available for", userId);
+        return;
+      }
+
+      // Resolve pending outcomes (24h+ old without outcome)
+      const resolved = await resolveOutcomes(eventStore, userId, data);
+      console.log(`[cron] ✅ Resolved ${resolved} pending outcomes for ${userId}`);
+
+      // Check if we have 5+ events to build a profile
+      const events = await eventStore.getByUser(userId, 100);
+
+      if (events.length >= 5) {
+        const profileStore = createSupabaseProfileStore();
+        if (profileStore) {
+          try {
+            const profile = buildCausalityProfile(userId, events);
+            await profileStore.saveProfile(profile);
+            console.log(`[cron] ✅ Generated CausalityProfile for ${userId} (${events.length} events)`);
+            console.log(`[cron]    - Personal HRV sensitivity: ${profile.personalConstants.alcoholHrvDropPerDrink}%`);
+            console.log(`[cron]    - Personal drink limit: ${profile.personalConstants.personalDrinkLimit} drinks`);
+          } catch (err) {
+            console.error("[cron] Failed to save profile:", err instanceof Error ? err.message : err);
+          }
+        }
+      }
+
+    } catch (error) {
+      console.error("[cron] Error resolving outcomes:", error instanceof Error ? error.message : error);
+    }
+  });
+
+  console.log("✅ Cron job scheduled: Daily outcome resolution at 00:00 UTC (09:00 KST)");
+}
+
 // Start bot
 console.log("🤖 P360 Discord Bot starting...");
+console.log("");
+scheduleCronJobs();
+console.log("");
 client.login(BOT_TOKEN);
