@@ -156,10 +156,11 @@ function scheduleCronJobs() {
 }
 
 // Schedule cron jobs BEFORE starting bot
-console.log("🤖 P360 Telegram Bot starting...");
-console.log("[cron] Initializing cron scheduling...");
+process.stdout.write("🤖 P360 Telegram Bot starting...\n");
+process.stdout.write("[cron] Initializing cron scheduling...\n");
 scheduleCronJobs();
-console.log("[cron] Cron initialization complete");
+process.stdout.write("[cron] Cron initialization complete\n");
+process.stdout.write("\n");
 
 bot.start({
   onStart: (botInfo) => {

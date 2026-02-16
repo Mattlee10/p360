@@ -660,9 +660,9 @@ function scheduleCronJobs() {
 }
 
 // Start bot
-console.log("🤖 P360 Discord Bot starting...");
-console.log("[cron] Initializing cron scheduling...");
+process.stdout.write("🤖 P360 Discord Bot starting...\n");
+process.stdout.write("[cron] Initializing cron scheduling...\n");
 scheduleCronJobs();
-console.log("[cron] Cron initialization complete");
-console.log("");
+process.stdout.write("[cron] Cron initialization complete\n");
+process.stdout.write("\n");
 client.login(BOT_TOKEN);
