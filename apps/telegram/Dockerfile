@@ -2,17 +2,20 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy docker-specific package.json (without @p360/core file: dependency)
-COPY package.docker.json ./package.json
+# Copy root package files
+COPY package*.json ./
 
-# Install production dependencies
-RUN npm install --omit=dev
+# Copy the telegram app
+COPY apps/telegram ./apps/telegram
 
-# Copy pre-built @p360/core (resolved from monorepo symlink)
-COPY .core-bundle/ ./node_modules/@p360/core/
+# Copy packages (core)
+COPY packages ./packages
 
-# Copy pre-built app (named build-output to avoid .gitignore dist/ rule)
-COPY build-output/ ./dist/
+# Install dependencies
+RUN npm install
 
-# Run the bot
-CMD ["node", "dist/index.js"]
+# Build
+RUN cd apps/telegram && npm run build
+
+# Start
+ENTRYPOINT ["sh", "-c", "cd apps/telegram && npm start"]
