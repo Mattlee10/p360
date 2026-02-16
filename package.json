@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "install-all": "npm install && npm install --workspace=apps/telegram --workspace=apps/discord --workspace=packages/core",
-    "build": "npm run build --workspaces",
+    "build": "npm run build --workspace=packages/core && npm run build --workspace=apps/telegram",
     "build-telegram": "cd apps/telegram && npm run build",
     "build-discord": "cd apps/discord && npm run build",
     "start": "cd apps/telegram && npm start",
