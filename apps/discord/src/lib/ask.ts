@@ -1,37 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { EmbedBuilder } from "discord.js";
-import { buildAdvisorContext } from "@p360/core";
-import type { BiometricData, NudgeResponse } from "@p360/core";
+import type { BiometricData, EventStore, CausalityProfile } from "@p360/core";
+import {
+  prepareAsk,
+  processAskResponse,
+  collectEvent,
+  getNudgeVerdictEmoji,
+  createSupabaseProfileStore,
+} from "@p360/core";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-
-function parseNudgeResponse(text: string): NudgeResponse | null {
-  try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    const parsed = JSON.parse(jsonMatch[0]);
-    return {
-      answer: parsed.answer || "",
-      options: Array.isArray(parsed.options) ? parsed.options : [],
-      strategy: parsed.strategy || "",
-      dataSource: parsed.dataSource || "",
-    };
-  } catch {
-    return null;
-  }
-}
-
-function getVerdictColor(verdict: string): number {
-  if (verdict === "safe") return 0x22c55e;
-  if (verdict === "caution") return 0xf59e0b;
-  return 0xef4444;
-}
-
-function getVerdictEmoji(verdict: string): string {
-  if (verdict === "safe") return "🟢";
-  if (verdict === "caution") return "🟡";
-  return "🔴";
-}
 
 export function isAskAvailable(): boolean {
   return !!ANTHROPIC_API_KEY;
@@ -40,6 +18,8 @@ export function isAskAvailable(): boolean {
 export async function getAskEmbed(
   question: string,
   data: BiometricData,
+  userId?: string,
+  eventStore?: EventStore,
 ): Promise<EmbedBuilder> {
   if (!ANTHROPIC_API_KEY) {
     return new EmbedBuilder()
@@ -48,14 +28,36 @@ export async function getAskEmbed(
       .setColor(0xf59e0b);
   }
 
-  const context = buildAdvisorContext(question, data);
+  // 1. Load profile if available
+  let profile: CausalityProfile | undefined;
+  if (userId) {
+    const profileStore = createSupabaseProfileStore();
+    if (profileStore) {
+      try {
+        const loaded = await profileStore.getProfile(userId);
+        if (loaded) profile = loaded;
+      } catch {
+        // Profile loading failed, continue without it
+      }
+    }
+  }
 
+  // 2. Prepare context (includes profile if available)
+  const prepared = prepareAsk({
+    question,
+    biometricData: data,
+    userId,
+    eventStore,
+    profile,
+  });
+
+  // 2. Call Claude API
   const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
   const response = await client.messages.create({
     model: "claude-sonnet-4-5-20250929",
     max_tokens: 1024,
-    system: context.systemPrompt,
-    messages: [{ role: "user", content: question }],
+    system: prepared.systemPrompt,
+    messages: [{ role: "user", content: prepared.question }],
   });
 
   const responseText = response.content
@@ -63,36 +65,41 @@ export async function getAskEmbed(
     .map((block) => block.text)
     .join("");
 
-  const nudge = parseNudgeResponse(responseText);
+  // 3. Process response
+  const result = processAskResponse(responseText, prepared);
 
-  if (!nudge) {
+  // 3.5. Collect causality event (fire-and-forget)
+  collectEvent(prepared, result).catch(() => {});
+
+  if (!result.nudge) {
     return new EmbedBuilder()
       .setTitle("💬 P360 Answer")
-      .setDescription(responseText.slice(0, 4096))
+      .setDescription(result.raw.slice(0, 4096))
       .setColor(0x3b82f6);
   }
 
+  // 4. Format for Discord embed
   const embed = new EmbedBuilder()
     .setTitle("💬 P360 Ask")
-    .setDescription(nudge.answer)
+    .setDescription(result.nudge.answer)
     .setColor(0x3b82f6);
 
-  if (nudge.options.length > 0) {
-    const optionsText = nudge.options
-      .map((opt) => `${getVerdictEmoji(opt.verdict)} **${opt.label}**: ${opt.impact}`)
+  if (result.nudge.options.length > 0) {
+    const optionsText = result.nudge.options
+      .map((opt) => `${getNudgeVerdictEmoji(opt.verdict)} **${opt.label}**: ${opt.impact}`)
       .join("\n");
     embed.addFields({ name: "📊 Options", value: optionsText });
   }
 
-  if (nudge.strategy) {
+  if (result.nudge.strategy) {
     embed.addFields({
       name: "📋 Strategy",
-      value: nudge.strategy.slice(0, 1024),
+      value: result.nudge.strategy.slice(0, 1024),
     });
   }
 
-  if (nudge.dataSource) {
-    embed.setFooter({ text: `📈 ${nudge.dataSource}` });
+  if (result.nudge.dataSource) {
+    embed.setFooter({ text: `📈 ${result.nudge.dataSource}` });
   }
 
   return embed;

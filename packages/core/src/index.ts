@@ -216,7 +216,28 @@ export {
   parseNudgeResponse,
   getNudgeVerdictEmoji,
   getNudgeVerdictColor,
+  collectEvent,
 } from "./ask-gateway";
+
+// ============================================
+// Supabase Event Store
+// ============================================
+
+export {
+  SupabaseEventStore,
+  createSupabaseEventStore,
+} from "./supabase-event-store";
+
+// ============================================
+// Supabase Profile Store
+// ============================================
+
+export type { ProfileStore } from "./supabase-profile-store";
+
+export {
+  SupabaseProfileStore,
+  createSupabaseProfileStore,
+} from "./supabase-profile-store";
 
 // ============================================
 // Time-Series Analysis

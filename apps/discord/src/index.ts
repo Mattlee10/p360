@@ -52,8 +52,12 @@ import {
   formatCostEmbed,
 } from "./lib/format";
 import { getAskEmbed, isAskAvailable } from "./lib/ask";
+import { createSupabaseEventStore } from "@p360/core";
 
 dotenv.config();
+
+// Shared event store instance (null if Supabase not configured)
+const eventStore = createSupabaseEventStore() ?? undefined;
 
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 
@@ -516,7 +520,7 @@ async function handleAsk(interaction: ChatInputCommandInteraction) {
       await interaction.editReply({ embeds: [notConnectedEmbed()] });
       return;
     }
-    const embed = await getAskEmbed(question, data);
+    const embed = await getAskEmbed(question, data, `dc-${userId}`, eventStore);
     updateLastCheck(userId);
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {

@@ -1,8 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
+import type { CausalityProfile } from "@p360/core";
 import {
   prepareAsk,
   processAskResponse,
+  collectEvent,
   getNudgeVerdictEmoji,
+  createSupabaseEventStore,
+  createSupabaseProfileStore,
 } from "@p360/core";
 import { fetchBiometricData, getRandomDemoData } from "../lib/oura";
 import { getAnthropicApiKey } from "../lib/config";
@@ -40,8 +44,28 @@ export async function askCommand(
       ? getRandomDemoData()
       : await fetchBiometricData();
 
-    // 2. Prepare ask context (keyword router + core analyses)
-    const prepared = prepareAsk({ question: q, biometricData: data });
+    // 2. Load profile + prepare ask context
+    const eventStore = createSupabaseEventStore();
+    const userId = process.env.P360_USER_ID || "cli-default";
+
+    let profile: CausalityProfile | undefined;
+    const profileStore = createSupabaseProfileStore();
+    if (profileStore) {
+      try {
+        const loaded = await profileStore.getProfile(userId);
+        if (loaded) profile = loaded;
+      } catch {
+        // Profile loading failed, continue without it
+      }
+    }
+
+    const prepared = prepareAsk({
+      question: q,
+      biometricData: data,
+      userId,
+      eventStore: eventStore ?? undefined,
+      profile,
+    });
 
     // 3. Call Claude API
     const client = new Anthropic({ apiKey });
@@ -59,6 +83,11 @@ export async function askCommand(
 
     // 4. Process and display
     const result = processAskResponse(responseText, prepared);
+
+    // 5. Collect causality event (fire-and-forget)
+    collectEvent(prepared, result).catch((err) => {
+      console.error("[ERROR] Failed to collect event:", err instanceof Error ? err.message : err);
+    });
 
     if (options.json) {
       console.log(JSON.stringify(result.nudge || { raw: result.raw }, null, 2));

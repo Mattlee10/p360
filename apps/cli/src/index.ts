@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 
+import * as dotenv from "dotenv";
 import { Command } from "commander";
 import { loginCommand, loginWithToken, loginWithAnthropicKey } from "./commands/login";
 import { statusCommand } from "./commands/status";
 import { askCommand } from "./commands/ask";
+
+// Load environment variables from .env.local
+dotenv.config({ path: ".env.local" });
 
 const program = new Command();
 

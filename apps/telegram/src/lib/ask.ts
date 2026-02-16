@@ -1,30 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { buildAdvisorContext } from "@p360/core";
-import type { BiometricData, NudgeResponse } from "@p360/core";
+import type { BiometricData, EventStore, CausalityProfile } from "@p360/core";
+import {
+  prepareAsk,
+  processAskResponse,
+  collectEvent,
+  getNudgeVerdictEmoji,
+  createSupabaseProfileStore,
+} from "@p360/core";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-
-function parseNudgeResponse(text: string): NudgeResponse | null {
-  try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    const parsed = JSON.parse(jsonMatch[0]);
-    return {
-      answer: parsed.answer || "",
-      options: Array.isArray(parsed.options) ? parsed.options : [],
-      strategy: parsed.strategy || "",
-      dataSource: parsed.dataSource || "",
-    };
-  } catch {
-    return null;
-  }
-}
-
-function getVerdictEmoji(verdict: string): string {
-  if (verdict === "safe") return "🟢";
-  if (verdict === "caution") return "🟡";
-  return "🔴";
-}
 
 export function isAskAvailable(): boolean {
   return !!ANTHROPIC_API_KEY;
@@ -33,19 +17,45 @@ export function isAskAvailable(): boolean {
 export async function getAskResponse(
   question: string,
   data: BiometricData,
+  userId?: string,
+  eventStore?: EventStore,
 ): Promise<string> {
   if (!ANTHROPIC_API_KEY) {
     return "⚠️ <b>Ask feature not configured</b>\n\nServer admin needs to set ANTHROPIC_API_KEY.";
   }
 
-  const context = buildAdvisorContext(question, data);
+  // 1. Load profile if available
+  let profile: CausalityProfile | undefined;
+  if (userId) {
+    const profileStore = createSupabaseProfileStore();
+    if (profileStore) {
+      try {
+        const loadedProfile = await profileStore.getProfile(userId);
+        if (loadedProfile) {
+          profile = loadedProfile;
+        }
+      } catch (err) {
+        // Profile loading failed, continue without it
+      }
+    }
+  }
 
+  // 2. Prepare context (now includes profile if available)
+  const prepared = prepareAsk({
+    question,
+    biometricData: data,
+    userId,
+    eventStore,
+    profile,
+  });
+
+  // 3. Call Claude API
   const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
   const response = await client.messages.create({
     model: "claude-sonnet-4-5-20250929",
     max_tokens: 1024,
-    system: context.systemPrompt,
-    messages: [{ role: "user", content: question }],
+    system: prepared.systemPrompt,
+    messages: [{ role: "user", content: prepared.question }],
   });
 
   const responseText = response.content
@@ -53,35 +63,39 @@ export async function getAskResponse(
     .map((block) => block.text)
     .join("");
 
-  const nudge = parseNudgeResponse(responseText);
+  // 4. Process response
+  const result = processAskResponse(responseText, prepared);
 
-  if (!nudge) {
-    return responseText;
+  // 3.5. Collect causality event (fire-and-forget)
+  collectEvent(prepared, result).catch(() => {});
+
+  if (!result.nudge) {
+    return result.raw;
   }
 
-  // Format for Telegram (HTML)
+  // 4. Format for Telegram (HTML)
   const lines: string[] = [];
 
-  lines.push(`💬 ${nudge.answer}`);
+  lines.push(`💬 ${result.nudge.answer}`);
   lines.push("");
 
-  if (nudge.options.length > 0) {
+  if (result.nudge.options.length > 0) {
     lines.push("<b>📊 Options:</b>");
-    for (const opt of nudge.options) {
-      const emoji = getVerdictEmoji(opt.verdict);
+    for (const opt of result.nudge.options) {
+      const emoji = getNudgeVerdictEmoji(opt.verdict);
       lines.push(`  ${emoji} ${opt.label}: ${opt.impact}`);
     }
     lines.push("");
   }
 
-  if (nudge.strategy) {
+  if (result.nudge.strategy) {
     lines.push("<b>📋 Strategy:</b>");
-    lines.push(nudge.strategy);
+    lines.push(result.nudge.strategy);
     lines.push("");
   }
 
-  if (nudge.dataSource) {
-    lines.push(`📈 ${nudge.dataSource}`);
+  if (result.nudge.dataSource) {
+    lines.push(`📈 ${result.nudge.dataSource}`);
   }
 
   return lines.join("\n");
