@@ -155,8 +155,10 @@ function scheduleCronJobs() {
   console.log("✅ Cron job scheduled: Daily outcome resolution at 00:00 UTC (09:00 KST)");
 }
 
-// Start bot
+// Schedule cron jobs BEFORE starting bot
 console.log("🤖 P360 Telegram Bot starting...");
+console.log("");
+scheduleCronJobs();
 console.log("");
 
 bot.start({
@@ -182,10 +184,6 @@ bot.start({
     console.log("  /demo             - Try with demo data");
     console.log("  /help             - Show all commands");
     console.log("");
-
-    // Schedule cron jobs
-    scheduleCronJobs();
-
     console.log("Press Ctrl+C to stop");
   },
 });
