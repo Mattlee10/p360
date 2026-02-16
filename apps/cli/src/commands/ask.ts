@@ -1,6 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { buildAdvisorContext } from "@p360/core";
-import type { NudgeResponse } from "@p360/core";
+import {
+  prepareAsk,
+  processAskResponse,
+  getNudgeVerdictEmoji,
+} from "@p360/core";
 import { fetchBiometricData, getRandomDemoData } from "../lib/oura";
 import { getAnthropicApiKey } from "../lib/config";
 
@@ -9,46 +12,15 @@ interface AskOptions {
   json?: boolean;
 }
 
-function parseNudgeResponse(text: string): NudgeResponse | null {
-  try {
-    // Extract JSON from response (handle markdown code blocks)
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    const parsed = JSON.parse(jsonMatch[0]);
-    return {
-      answer: parsed.answer || "",
-      options: Array.isArray(parsed.options) ? parsed.options : [],
-      strategy: parsed.strategy || "",
-      dataSource: parsed.dataSource || "",
-    };
-  } catch {
-    return null;
-  }
-}
-
-function getVerdictEmoji(verdict: string): string {
-  if (verdict === "safe") return "🟢";
-  if (verdict === "caution") return "🟡";
-  return "🔴";
-}
-
 export async function askCommand(
   question: string,
   options: AskOptions,
 ): Promise<void> {
   try {
-    if (!question || question.trim().length === 0) {
-      console.log("");
-      console.log("  Usage: p360 ask \"your question\"");
-      console.log("");
-      console.log("  Examples:");
-      console.log("    p360 ask \"회식인데 맥주 몇 잔까지 괜찮아?\"");
-      console.log("    p360 ask \"should I work out today?\"");
-      console.log("    p360 ask \"커피 지금 마셔도 되나?\"");
-      console.log("    p360 ask \"I'm tired but need to keep working\"");
-      console.log("");
-      return;
-    }
+    // No question = general readiness check
+    const q = question && question.trim().length > 0
+      ? question.trim()
+      : "How am I doing today? What should I focus on?";
 
     const apiKey = getAnthropicApiKey();
     if (!apiKey) {
@@ -68,16 +40,16 @@ export async function askCommand(
       ? getRandomDemoData()
       : await fetchBiometricData();
 
-    // 2. Build advisor context (keyword router + core analyses)
-    const context = buildAdvisorContext(question, data);
+    // 2. Prepare ask context (keyword router + core analyses)
+    const prepared = prepareAsk({ question: q, biometricData: data });
 
     // 3. Call Claude API
     const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
       model: "claude-sonnet-4-5-20250929",
       max_tokens: 1024,
-      system: context.systemPrompt,
-      messages: [{ role: "user", content: question }],
+      system: prepared.systemPrompt,
+      messages: [{ role: "user", content: prepared.question }],
     });
 
     const responseText = response.content
@@ -85,46 +57,44 @@ export async function askCommand(
       .map((block) => block.text)
       .join("");
 
-    // 4. Parse and display
-    const nudge = parseNudgeResponse(responseText);
+    // 4. Process and display
+    const result = processAskResponse(responseText, prepared);
 
     if (options.json) {
-      console.log(JSON.stringify(nudge || { raw: responseText }, null, 2));
+      console.log(JSON.stringify(result.nudge || { raw: result.raw }, null, 2));
       return;
     }
 
-    if (nudge) {
-      // Formatted output
+    if (result.nudge) {
       console.log("");
-      console.log(`  💬 ${nudge.answer}`);
+      console.log(`  💬 ${result.nudge.answer}`);
       console.log("");
 
-      if (nudge.options.length > 0) {
+      if (result.nudge.options.length > 0) {
         console.log("  📊 Options:");
-        for (const opt of nudge.options) {
-          const emoji = getVerdictEmoji(opt.verdict);
+        for (const opt of result.nudge.options) {
+          const emoji = getNudgeVerdictEmoji(opt.verdict);
           console.log(`    ${emoji} ${opt.label}: ${opt.impact}`);
         }
         console.log("");
       }
 
-      if (nudge.strategy) {
+      if (result.nudge.strategy) {
         console.log("  📋 Strategy:");
-        const lines = nudge.strategy.split("\n");
+        const lines = result.nudge.strategy.split("\n");
         for (const line of lines) {
           console.log(`    ${line}`);
         }
         console.log("");
       }
 
-      if (nudge.dataSource) {
-        console.log(`  📈 ${nudge.dataSource}`);
+      if (result.nudge.dataSource) {
+        console.log(`  📈 ${result.nudge.dataSource}`);
         console.log("");
       }
     } else {
-      // Fallback: raw text
       console.log("");
-      console.log(`  ${responseText}`);
+      console.log(`  ${result.raw}`);
       console.log("");
     }
   } catch (error) {

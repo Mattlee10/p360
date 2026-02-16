@@ -1,7 +1,7 @@
 {
   "name": "p360-cli",
-  "version": "0.1.0",
-  "description": "CLI tool that tells you if you should work out today based on your Oura data",
+  "version": "0.3.0",
+  "description": "Biometric-driven decision support for high-performers",
   "main": "dist/index.js",
   "bin": {
     "p360": "./bin/p360"
