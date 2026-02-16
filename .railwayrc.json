@@ -1,0 +1,35 @@
+{
+  "projectId": null,
+  "environmentId": "production",
+  "services": {
+    "telegram": {
+      "rootDirectory": "apps/telegram",
+      "buildCommand": "npm install && npm run build",
+      "startCommand": "npm start",
+      "replicas": 1,
+      "memory": "512MB",
+      "restartPolicy": "ON_FAILURE",
+      "maxRetries": 5
+    },
+    "discord": {
+      "rootDirectory": "apps/discord",
+      "buildCommand": "npm install && npm run build",
+      "startCommand": "npm start",
+      "replicas": 1,
+      "memory": "512MB",
+      "restartPolicy": "ON_FAILURE",
+      "maxRetries": 5
+    }
+  },
+  "environmentVariables": {
+    "TELEGRAM_BOT_TOKEN": "{{ secrets.TELEGRAM_BOT_TOKEN }}",
+    "DISCORD_BOT_TOKEN": "{{ secrets.DISCORD_BOT_TOKEN }}",
+    "ANTHROPIC_API_KEY": "{{ secrets.ANTHROPIC_API_KEY }}",
+    "OURA_API_KEY": "{{ secrets.OURA_API_KEY }}",
+    "SUPABASE_URL": "{{ secrets.SUPABASE_URL }}",
+    "SUPABASE_ANON_KEY": "{{ secrets.SUPABASE_ANON_KEY }}",
+    "SUPABASE_SERVICE_ROLE_KEY": "{{ secrets.SUPABASE_SERVICE_ROLE_KEY }}",
+    "P360_USER_ID": "bot-default",
+    "NODE_ENV": "production"
+  }
+}
