@@ -1,4 +1,5 @@
 import { BiometricData } from "./types";
+import type { CausalityProfile } from "./causality";
 
 // ============================================
 // Recovery Cost Types
@@ -145,7 +146,8 @@ export function parseSubstance(input: string): SubstanceType | null {
 function calculateAlcoholCost(
   data: BiometricData,
   substance: SubstanceType,
-  amount: number
+  amount: number,
+  profile?: CausalityProfile,
 ): RecoveryCost {
   const info = SUBSTANCE_INFO[substance];
   const standardDrinks = amount * info.standardUnits;
@@ -154,14 +156,20 @@ function calculateAlcoholCost(
   const timeline: DayCost[] = [];
   let totalRecoveryDays = 0;
 
+  // Use personal constants if available, otherwise population defaults
+  const hrvDropPerDrink = profile?.personalConstants.alcoholHrvDropPerDrink
+    ?? ALCOHOL_PER_DRINK.hrvDropPercent;
+  const recoveryDropPerDrink = profile?.personalConstants.alcoholRecoveryDropPerDrink
+    ?? ALCOHOL_PER_DRINK.recoveryDrop;
+
   // Calculate day-by-day impact
   for (let day = 0; day < ALCOHOL_DECAY.length; day++) {
     const decayFactor = ALCOHOL_DECAY[day];
     const hrvChange = -Math.round(
-      ALCOHOL_PER_DRINK.hrvDropPercent * standardDrinks * multiplier * decayFactor
+      hrvDropPerDrink * standardDrinks * multiplier * decayFactor
     );
     const recoveryDrop = Math.round(
-      ALCOHOL_PER_DRINK.recoveryDrop * standardDrinks * multiplier * decayFactor
+      recoveryDropPerDrink * standardDrinks * multiplier * decayFactor
     );
 
     // Skip days with negligible impact
@@ -255,7 +263,8 @@ function calculateAlcoholCost(
 function calculateCaffeineCost(
   data: BiometricData,
   substance: SubstanceType,
-  amount: number
+  amount: number,
+  profile?: CausalityProfile,
 ): RecoveryCost {
   const info = SUBSTANCE_INFO[substance];
   const standardCups = amount * info.standardUnits;
@@ -263,12 +272,19 @@ function calculateCaffeineCost(
   const hour = new Date().getHours();
   const hoursUntilSleep = Math.max(0, 22 - hour); // assume 10pm sleep
 
+  // Use personal constants if available
+  const halfLifeHours = profile?.personalConstants.caffeineHalfLifeHours
+    ?? CAFFEINE_HALF_LIFE_HOURS;
+
   // Caffeine remaining at sleep time
-  const halfLives = hoursUntilSleep / CAFFEINE_HALF_LIFE_HOURS;
+  const halfLives = hoursUntilSleep / halfLifeHours;
   const caffeineAtSleep = Math.pow(0.5, halfLives); // fraction remaining
 
+  const sleepDropPerCup = profile?.personalConstants.caffeineSleepImpactPerCup
+    ?? CAFFEINE_PER_CUP.sleepScoreDrop;
+
   const sleepImpact = Math.round(
-    CAFFEINE_PER_CUP.sleepScoreDrop * standardCups * caffeineAtSleep
+    sleepDropPerCup * standardCups * caffeineAtSleep
   );
   const hrvDrop = Math.round(
     CAFFEINE_PER_CUP.hrvDropPercent * standardCups
@@ -363,14 +379,15 @@ function calculateCaffeineCost(
 export function getRecoveryCost(
   data: BiometricData,
   substance: SubstanceType,
-  amount: number
+  amount: number,
+  profile?: CausalityProfile,
 ): RecoveryCost {
   const info = SUBSTANCE_INFO[substance];
 
   if (info.category === "alcohol") {
-    return calculateAlcoholCost(data, substance, amount);
+    return calculateAlcoholCost(data, substance, amount, profile);
   }
-  return calculateCaffeineCost(data, substance, amount);
+  return calculateCaffeineCost(data, substance, amount, profile);
 }
 
 export function getSubstanceList(): string[] {

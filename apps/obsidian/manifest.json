@@ -1,0 +1,10 @@
+{
+  "id": "p360",
+  "name": "P360 - Bio-data Insights",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "Get workout, drink, and mood insights based on your Oura/WHOOP data",
+  "author": "P360",
+  "authorUrl": "https://github.com/p360",
+  "isDesktopOnly": false
+}

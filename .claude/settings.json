@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(pnpm *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(gh pr *)",
+      "Bash(gh issue *)",
+      "Bash(npx tsc *)",
+      "Bash(npx prettier *)",
+      "Bash(npx eslint *)",
+      "Bash(curl -s *)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(git push --force *)",
+      "Bash(git reset --hard *)",
+      "Read(.env.production)",
+      "Read(**/secrets/**)",
+      "Edit(.env.production)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FILE=$(echo '$TOOL_INPUT' | jq -r '.file_path // .filePath // empty'); if [ -n \"$FILE\" ] && [[ \"$FILE\" == *.ts || \"$FILE\" == *.tsx || \"$FILE\" == *.js || \"$FILE\" == *.jsx || \"$FILE\" == *.json || \"$FILE\" == *.md ]]; then npx prettier --write \"$FILE\" 2>/dev/null || true; fi"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "osascript -e 'display notification \"Claude Code needs attention\" with title \"P360\"' 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}

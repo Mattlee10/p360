@@ -1,4 +1,5 @@
 import { BiometricData } from "./types";
+import type { CausalityProfile } from "./causality";
 
 // ============================================
 // Drink Decision Types
@@ -91,14 +92,15 @@ function getBaselineDeviation(hrvBalance: number | null): number {
 
 export function getDrinkDecision(
   data: BiometricData,
-  history?: DrinkHistory
+  history?: DrinkHistory,
+  profile?: CausalityProfile,
 ): DrinkDecision {
   const baselineDeviation = getBaselineDeviation(data.hrvBalance);
   const sleepScore = data.sleepScore ?? 50;
   const readinessScore = data.readinessScore ?? 50;
 
-  // Base limit (when in good condition)
-  let baseLimit = 3;
+  // Base limit: use personal learned limit if available
+  let baseLimit = profile?.personalConstants.personalDrinkLimit ?? 3;
 
   const reasoning: string[] = [];
 

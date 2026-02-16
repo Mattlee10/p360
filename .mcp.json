@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "reddit": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/reddit-mcp"],
+      "env": {},
+      "description": "Reddit access for r/Biohackers, r/QuantifiedSelf research"
+    }
+  }
+}

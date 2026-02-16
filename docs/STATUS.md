@@ -357,6 +357,14 @@ If any NO → revise before sending.
 
 ## Parking Lot (Stuff to Revisit Later)
 
+### When Bot Conversion is Stuck (Emergency GTM Pivot)
+- [ ] **Reverse-Engineer Causality** (기회가 있을 때 실행)
+  - 각 hot 리드의 7-14일 데이터 깊이 있게 분석
+  - "당신만의 성능 곡선" 맞춤형 리포트 작성
+  - 개인별 인과관계 데이터 축적 = p360의 moat
+  - **Full doc**: [REVERSE_ENGINEER_CAUSALITY.md](./gtm/REVERSE_ENGINEER_CAUSALITY.md)
+  - **Status**: "기회 신호" 대기 중 (Bot 0% 전환 2주+ OR 유저 참여 의향 표현)
+
 ### When ≥30% of Users Ask For It
 - [ ] Meta Glasses integration (6-12 months out)
 - [ ] Team/household features
@@ -482,10 +490,29 @@ They LOVE data that clarifies trade-offs.
 
 ---
 
+## 🎯 Strategic Direction (Updated 2026-02-13)
+
+**Read:** `/docs/strategic/SURVIVAL_STRATEGY.md` for full business strategy
+
+**Core Insight:** p360 is NOT an AI model builder. We are a **Context Engine** that owns the causality data between biology, work patterns, and decisions.
+
+**Key Principle:** "The Bitter Lesson" (Sutton, 2019) applied inversely:
+- BigTech wins through Abstraction + Scale
+- We win through Concreteness + Specificity
+- Our Moat = "This person's unique performance curve" (not generic medical knowledge)
+
+**Immediate Focus (Phase 1-B):**
+- Parasitize → Pre-sell → Iterate (6단계 파이프라인 참조: PERSONAL_PRINCIPLES.md)
+- HOT 리드 4명 Step 4-5 완료 (분석 + 도구 reveal)
+- 체크포인트 기준: 3명+ 도구 사용 신호 → Scale decision
+
+---
+
 ## Version History
 
 | Version | Date | Change |
 |---------|------|--------|
+| 1.2 | 2026-02-13 | Add SURVIVAL_STRATEGY.md + Strategic Direction summary |
 | 1.1 | 2026-02-12 | Add Coadaptive Intelligence design direction (Phase 2) from dogfooding insights |
 | 1.0 | 2026-02-05 | Initial status snapshot, Telegram priority added, Meta Glass documented as strategic option |
 

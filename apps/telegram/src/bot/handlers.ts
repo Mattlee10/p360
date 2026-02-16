@@ -57,6 +57,10 @@ import {
   formatCostTelegram,
 } from "../lib/cost";
 import { getAskResponse, isAskAvailable } from "../lib/ask";
+import { createSupabaseEventStore } from "@p360/core";
+
+// Shared event store instance (null if Supabase not configured)
+const eventStore = createSupabaseEventStore() ?? undefined;
 
 // Helper to send HTML messages
 async function reply(ctx: Context, text: string) {
@@ -835,7 +839,8 @@ Ask about your body state in any language.
       return;
     }
 
-    const message = await getAskResponse(question, data);
+    const userId = `tg-${telegramId}`;
+    const message = await getAskResponse(question, data, userId, eventStore);
     updateLastCheck(telegramId);
     await reply(ctx, message);
   } catch (error) {
@@ -866,7 +871,8 @@ export async function handleAskDemo(ctx: Context) {
 
   try {
     const data = getRandomDemoData();
-    const message = await getAskResponse(question, data);
+    const userId = telegramId ? `tg-${telegramId}` : "tg-demo";
+    const message = await getAskResponse(question, data, userId, eventStore);
     const demoNote = `\n\n<i>📝 This is demo data. Use /connect to see your real data.</i>`;
     await reply(ctx, message + demoNote);
   } catch (error) {
