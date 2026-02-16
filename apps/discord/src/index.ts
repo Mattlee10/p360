@@ -656,12 +656,13 @@ function scheduleCronJobs() {
     }
   });
 
-  console.log("✅ Cron job scheduled: Daily outcome resolution at 00:00 UTC (09:00 KST)");
+  console.log("[cron] ✅ Cron job scheduled: Daily outcome resolution at 00:00 UTC (09:00 KST)");
 }
 
 // Start bot
 console.log("🤖 P360 Discord Bot starting...");
-console.log("");
+console.log("[cron] Initializing cron scheduling...");
 scheduleCronJobs();
+console.log("[cron] Cron initialization complete");
 console.log("");
 client.login(BOT_TOKEN);

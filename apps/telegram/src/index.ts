@@ -152,14 +152,14 @@ function scheduleCronJobs() {
     }
   });
 
-  console.log("✅ Cron job scheduled: Daily outcome resolution at 00:00 UTC (09:00 KST)");
+  console.log("[cron] ✅ Cron job scheduled: Daily outcome resolution at 00:00 UTC (09:00 KST)");
 }
 
 // Schedule cron jobs BEFORE starting bot
 console.log("🤖 P360 Telegram Bot starting...");
-console.log("");
+console.log("[cron] Initializing cron scheduling...");
 scheduleCronJobs();
-console.log("");
+console.log("[cron] Cron initialization complete");
 
 bot.start({
   onStart: (botInfo) => {
