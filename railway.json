@@ -2,7 +2,7 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm install --workspace=packages/core && cd apps/telegram && npm install && npm run build"
+    "buildCommand": "npm install && npm run build"
   },
   "deploy": {
     "numReplicas": 1,
