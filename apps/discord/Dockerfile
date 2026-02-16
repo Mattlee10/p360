@@ -2,20 +2,15 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy root package files
-COPY package*.json ./
+# Copy everything
+COPY . .
 
-# Copy the discord app
-COPY apps/discord ./apps/discord
-
-# Copy packages (core)
-COPY packages ./packages
-
-# Install dependencies
+# Install all dependencies
 RUN npm install
 
-# Build
+# Build discord app
 RUN cd apps/discord && npm run build
 
-# Start
-ENTRYPOINT ["sh", "-c", "cd apps/discord && npm start"]
+# Start discord app
+WORKDIR /app/apps/discord
+CMD ["npm", "start"]

@@ -2,20 +2,15 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy root package files
-COPY package*.json ./
+# Copy everything
+COPY . .
 
-# Copy the telegram app
-COPY apps/telegram ./apps/telegram
-
-# Copy packages (core)
-COPY packages ./packages
-
-# Install dependencies
+# Install all dependencies
 RUN npm install
 
-# Build
+# Build telegram app
 RUN cd apps/telegram && npm run build
 
-# Start
-ENTRYPOINT ["sh", "-c", "cd apps/telegram && npm start"]
+# Start telegram app
+WORKDIR /app/apps/telegram
+CMD ["npm", "start"]
