@@ -3,18 +3,20 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy monorepo structure FIRST (to establish workspaces)
+# Copy all package.json and lock files FIRST
 COPY package*.json ./
 COPY .npmrc ./
 COPY packages/core/package*.json packages/core/
 COPY apps/telegram/package*.json apps/telegram/
 
-# Install dependencies
-RUN npm ci
+# Install dependencies (only for workspaces we need)
+RUN npm install --legacy-peer-deps
 
 # Copy source code
-COPY packages/core packages/core
-COPY apps/telegram apps/telegram
+COPY packages/core/src packages/core/src
+COPY packages/core/tsconfig.json packages/core/
+COPY apps/telegram/src apps/telegram/src
+COPY apps/telegram/tsconfig.json apps/telegram/
 
 # Build core and telegram
 RUN npm run build
