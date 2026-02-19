@@ -36,5 +36,6 @@ ENV NODE_ENV=production
 ENV NODE_OPTIONS="--max-old-space-size=256"
 
 # Start telegram bot
+WORKDIR /app/apps/telegram
 EXPOSE 3000
-CMD ["bash", "-c", "cd apps/telegram && npm start"]
+CMD ["npm", "start"]
