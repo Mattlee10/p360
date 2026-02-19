@@ -1,8 +1,8 @@
 /**
- * SupabaseEventStore — Supabase 기반 CausalityEvent 영구 저장소
+ * PHASE 2 — createSupabaseEventStore() factory만 Phase 1에서 사용
  *
- * InMemoryEventStore 대체: 모든 이벤트가 Supabase에 저장되어
- * 앱 재시작/멀티 디바이스에서도 데이터 유지
+ * SupabaseEventStore: Supabase 기반 CausalityEvent 영구 저장소
+ * Phase 2에서 SupabaseEventStore 클래스 직접 export 활성화 예정
  */
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";

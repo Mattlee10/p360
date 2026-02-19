@@ -1,9 +1,8 @@
 /**
- * SupabaseProfileStore — Supabase 기반 CausalityProfile 영구 저장소
+ * PHASE 2 — createSupabaseProfileStore() factory만 Phase 1에서 사용
  *
- * buildCausalityProfile()로 계산된 개인 패턴을 저장
- * /ask 호출 시 프로필 로드 → buildSystemPrompt()에 주입
- * → "YOUR HRV drops 5.2% per drink" 형태의 개인화된 추천
+ * SupabaseProfileStore: Supabase 기반 CausalityProfile 영구 저장소
+ * Phase 2에서 SupabaseProfileStore 클래스/ProfileStore 인터페이스 직접 export 활성화 예정
  */
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";

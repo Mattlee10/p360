@@ -1,9 +1,6 @@
 import { BiometricData } from "./types";
 import { calculateDecisionReadiness } from "./algorithm";
-import { getDrinkDecision, getSocialStrategy } from "./drink";
 import { getRecoveryCost, parseSubstance } from "./cost";
-import { getWhyDecision, parseWhyInput } from "./why";
-import { getWorkoutDecision, parseSport } from "./workout";
 import { calculateRollingAverage, calculateBaselineVariance, detectTrend, detectSignificance } from "./timeseries";
 import type { CausalityProfile } from "./causality";
 
@@ -109,7 +106,11 @@ export function matchRoutes(question: string): string[] {
 // Analysis Runner
 // ============================================
 
-function runAnalyses(
+// ============================================
+// Minimal Analysis (Claude handles the rest)
+// ============================================
+
+function minimalAnalysis(
   routes: string[],
   data: BiometricData,
   question: string,
@@ -120,42 +121,31 @@ function runAnalyses(
   // Always include base readiness
   analyses.readiness = calculateDecisionReadiness(data);
 
+  // Biometric deltas (Claude uses these for reasoning)
+  const hrvDeviation = data.hrvBalance !== null ? data.hrvBalance - 50 : null;
+  const sleepGap = data.sleepScore !== null ? data.sleepScore - 70 : null;
+  const readinessGap = data.readinessScore !== null ? data.readinessScore - 70 : null;
+
+  analyses.deltas = {
+    hrvDeviation,
+    sleepGap,
+    readinessGap,
+    hrvStatus: hrvDeviation === null ? "unknown"
+      : hrvDeviation > 10 ? "above_baseline"
+      : hrvDeviation < -10 ? "below_baseline"
+      : "at_baseline",
+  };
+
   for (const route of routes) {
     switch (route) {
       case "drink": {
-        analyses.drink = getDrinkDecision(data, undefined, profile);
-        analyses.socialStrategy = getSocialStrategy(getDrinkDecision(data, undefined, profile));
-
-        // Run cost for common drink amounts (with personal constants)
+        // Provide cost data for Claude to reference (quantified impact)
         analyses.drinkCosts = [1, 2, 3, 4, 5].map((n) =>
           getRecoveryCost(data, "beer", n, profile),
         );
-
-        // Also add spirits cost for soju/cocktail context
         analyses.spiritsCosts = [1, 2, 3].map((n) =>
           getRecoveryCost(data, "spirits", n, profile),
         );
-        break;
-      }
-
-      case "workout": {
-        // Try to detect sport from question
-        const sportWords = question.toLowerCase().split(/\s+/);
-        let sport = undefined;
-        for (const word of sportWords) {
-          const parsed = parseSport(word);
-          if (parsed) {
-            sport = parsed;
-            break;
-          }
-        }
-        analyses.workout = getWorkoutDecision(data, sport);
-        break;
-      }
-
-      case "tired": {
-        const whyInput = parseWhyInput(question);
-        analyses.why = getWhyDecision(data, whyInput);
         break;
       }
 
@@ -163,7 +153,6 @@ function runAnalyses(
         analyses.coffeeCosts = [1, 2, 3].map((n) =>
           getRecoveryCost(data, "coffee", n, profile),
         );
-
         analyses.teaCosts = [1, 2, 3].map((n) =>
           getRecoveryCost(data, "tea", n, profile),
         );
@@ -171,7 +160,6 @@ function runAnalyses(
       }
 
       case "cost": {
-        // Try to find substance in question
         const words = question.toLowerCase().split(/\s+/);
         for (const word of words) {
           const sub = parseSubstance(word);
@@ -187,14 +175,11 @@ function runAnalyses(
 
       case "rolling": {
         // Time-series analysis with rolling averages
-        // Generate synthetic historical data for demo purposes
         // In production, this would come from Oura API historical fetch
-
         const historyLength = 60;
         const hrvHistory: number[] = [];
         const readinessHistory: number[] = [];
 
-        // Generate realistic synthetic history
         for (let i = 0; i < historyLength; i++) {
           const baseHrv = (data.hrvBalance ?? 50) + Math.sin(i / 7) * 10;
           const noiseHrv = (Math.random() - 0.5) * 15;
@@ -205,22 +190,14 @@ function runAnalyses(
           readinessHistory.push(Math.max(0, Math.min(100, baseReadiness + noiseReadiness)));
         }
 
-        // Calculate rolling averages (7-day default)
         const hrvRolling = calculateRollingAverage(hrvHistory, 7);
         const readinessRolling = calculateRollingAverage(readinessHistory, 7);
-
-        // Detect trends
         const hrvTrends = detectTrend(hrvRolling);
         const readinessTrends = detectTrend(readinessRolling);
-
-        // Calculate baselines
         const hrvBaseline = calculateBaselineVariance(hrvRolling);
         const readinessBaseline = calculateBaselineVariance(readinessRolling);
-
-        // Detect recent peaks
         const recentHrvDelta = hrvRolling[hrvRolling.length - 1] - hrvBaseline.mean;
         const recentReadinessDelta = readinessRolling[readinessRolling.length - 1] - readinessBaseline.mean;
-
         const hrvSignificant = detectSignificance(recentHrvDelta, hrvBaseline.stdev);
         const readinessSignificant = detectSignificance(recentReadinessDelta, readinessBaseline.stdev);
 
@@ -245,9 +222,11 @@ function runAnalyses(
         break;
       }
 
+      // workout, tired, general → Claude handles directly from biometrics
+      case "workout":
+      case "tired":
       case "general":
       default:
-        // readiness already included above
         break;
     }
   }
@@ -296,7 +275,8 @@ export function buildSystemPrompt(
   const biometrics = formatBiometrics(data);
   const analysisJson = JSON.stringify(analyses, null, 2);
 
-  // Personal patterns section (only if patterns exist)
+  // Phase 2: Personal patterns section (only if CausalityProfile exists)
+  // 현재는 population defaults 사용, Phase 2에서 개인화 데이터 주입
   let personalSection = "";
   if (profile && profile.patterns.length > 0) {
     const patternLines = profile.patterns.map((p) => `- ${p.description}`).join("\n");
@@ -310,6 +290,7 @@ The pre-computed analysis already uses these personal values. Reference them in 
 
   return `You are P360, a biometric-data-driven personal advisor.
 You have the user's real-time body data and pre-computed analysis below.
+YOU are the decision engine — use biometrics + context to give personalized advice.
 
 RULES:
 1. Answer in the user's language (detect from their question)
@@ -320,6 +301,32 @@ RULES:
 6. NEVER moralize or lecture. Show costs, let them decide.
 7. If the user must do something (회식, deadline), optimize WITHIN that constraint
 8. Use the pre-computed analysis data for accurate numbers. Do NOT invent numbers.
+9. COADAPTIVE: Show trade-offs, not prescriptions. "60min more work = -7pts readiness tomorrow. Worth it?"
+
+DOMAIN GUIDANCE:
+
+WORKOUT questions:
+- Use readiness score to determine: TRAIN HARD (≥70 + HRV normal/above), TRAIN LIGHT (50-69), REST (<50)
+- Include specific intensity: HR zones, RPE, duration
+- If user mentions a sport, give sport-specific advice (warmup, duration, intensity tips)
+- Show tomorrow's outlook based on today's decision
+
+DRINK questions:
+- Use drinkCosts data (if available) for exact HRV/recovery impact numbers
+- Calculate safe limit from readiness + HRV + sleep state
+- Show multi-day recovery timeline for heavier drinking
+- Convert to user's drink units (소주, 맥주, pint, etc.)
+
+FATIGUE/WHY questions:
+- Determine if physiological (HRV/sleep deficit), psychological (metrics fine), or mixed
+- If physiological: "This is NOT laziness — your body data confirms fatigue"
+- If psychological: "Your body is fine — this might be situational"
+- Give constraint-aware recommendations ("You'll work anyway? Here's how to minimize damage")
+
+COFFEE questions:
+- Use coffeeCosts data for sleep impact calculation
+- Factor in time of day (caffeine half-life ~6 hours)
+- Show cutoff time for tonight's sleep
 
 DRINK UNIT CONVERSION:
 When the user mentions drinks, convert to standard drinks for impact calculation.
@@ -369,7 +376,7 @@ export function buildAdvisorContext(
   profile?: CausalityProfile,
 ): AdvisorContext {
   const routes = matchRoutes(question);
-  const analyses = runAnalyses(routes, data, question, profile);
+  const analyses = minimalAnalysis(routes, data, question, profile);
   const systemPrompt = buildSystemPrompt(data, analyses, profile);
 
   return {

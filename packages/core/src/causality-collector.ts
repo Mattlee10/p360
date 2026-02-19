@@ -1,11 +1,10 @@
 /**
- * Causality Collector — /ask 파이프라인에서 자동 이벤트 수집
+ * PHASE 2 — extractEventFromAsk()만 Phase 1 ask-gateway.ts에서 사용
  *
- * 유저가 /ask "맥주 3잔 마셔도 돼?" 하면:
- * 1. matchRoutes()가 "drink" 감지
- * 2. extractEventFromAsk()가 질문에서 action 추출
- * 3. InMemoryEventStore에 저장
- * 4. 다음날 resolveOutcomes()가 outcome 자동 연결
+ * Causality Collector: /ask 파이프라인에서 자동 이벤트 수집
+ * InMemoryEventStore, resolveOutcomes()는 Phase 2에서 활성화
+ *
+ * Phase 2 활성화 시점: 3명 이상 active users 확보 후
  */
 
 import type { BiometricData } from "./types";

@@ -1,7 +1,13 @@
 // Simple in-memory storage for MVP
 // TODO: Replace with Supabase for production
 
-import type { ProviderType, MoodEntry, DrinkLog } from "@p360/core";
+import type { ProviderType, MoodEntry } from "@p360/core";
+
+export interface DrinkLog {
+  date: string;
+  amount: number;
+  timestamp: Date;
+}
 
 interface UserData {
   discordId: string; // Discord uses string snowflake IDs

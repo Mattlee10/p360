@@ -1,10 +1,11 @@
 /**
- * Causality Analyzer — 축적된 이벤트에서 개인 패턴 발견
+ * PHASE 2 — buildCausalityProfile()만 Phase 1 앱에서 사용
  *
- * mood.ts의 Pearson correlation 패턴을 확장하여:
- * - Linear regression으로 개인 민감도 계산
- * - 도메인별 패턴 추출 (alcohol, caffeine, workout)
- * - personalConstants 생성 → 알고리즘에 주입
+ * Causality Analyzer: 축적된 이벤트에서 개인 패턴 발견
+ * 개별 분석 함수 (analyzeAlcohol*, analyzeCaffeine* 등)는
+ * index.ts에서 export하지 않음 (내부 사용만)
+ *
+ * Phase 2 활성화 시점: 3명 이상 active users 확보 후
  */
 
 import type {

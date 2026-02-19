@@ -1,7 +1,13 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import type { DrinkLog, MoodEntry } from "@p360/core";
+import type { MoodEntry } from "@p360/core";
+
+interface DrinkLog {
+  date: string;
+  amount: number;
+  timestamp: Date;
+}
 
 const CONFIG_DIR = path.join(os.homedir(), ".p360");
 const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");

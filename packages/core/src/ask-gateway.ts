@@ -12,10 +12,11 @@ export interface AskRequest {
   question?: string;
   domain?: string;
   biometricData: BiometricData;
+  /** Phase 2: 개인화 프로필 (선택사항, 없으면 population defaults 사용) */
   profile?: CausalityProfile;
-  /** Optional: userId for causality event tracking */
+  /** Phase 2: userId for causality event tracking */
   userId?: string;
-  /** Optional: EventStore for persisting causality events */
+  /** Phase 2: EventStore for persisting causality events */
   eventStore?: EventStore;
 }
 
@@ -134,7 +135,7 @@ export function getNudgeVerdictColor(verdict: string): number {
 }
 
 // ============================================
-// Causality Event Collection
+// Causality Event Collection (Phase 2 pipeline — 현재 fire-and-forget)
 // ============================================
 
 /**

@@ -1,0 +1,45 @@
+{
+  "name": "@p360/openclaw",
+  "version": "0.1.0",
+  "description": "OpenClaw Hub - Unified platform router for p360",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "test": "vitest",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": [
+    "p360",
+    "biometric",
+    "platform-adapter",
+    "router"
+  ],
+  "author": "Matt Lee",
+  "license": "MIT",
+  "dependencies": {
+    "@p360/core": "*",
+    "@supabase/supabase-js": "^2.44.0"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/sdk": ">=0.39.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.54.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.2",
+    "vitest": "^1.1.0"
+  }
+}

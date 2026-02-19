@@ -7,20 +7,11 @@ import {
 import * as dotenv from "dotenv";
 import cron from "node-cron";
 import {
-  getWorkoutDecision,
-  getDrinkDecision,
-  getSocialStrategy,
-  calculateDrinkHistory,
-  getWhyDecision,
   getMoodDecision,
   calculateMoodInsight,
   getRecoveryCost,
   parseSubstance,
-  parseSport,
-  getSportList,
-  parseWhyInput,
   ProviderType,
-  SubstanceType,
   resolveOutcomes,
   createSupabaseProfileStore,
   buildCausalityProfile,
@@ -45,14 +36,11 @@ import {
   getMoodEntries,
   addRecoveryScore,
   getRecoveryHistory,
+  type DrinkLog,
 } from "./lib/storage";
 import {
-  formatWorkoutEmbed,
-  formatDrinkEmbed,
-  formatWhyEmbed,
   formatMoodEmbed,
   formatMoodHistoryEmbed,
-  formatDrinkHistoryEmbed,
   formatCostEmbed,
 } from "./lib/format";
 import { getAskEmbed, isAskAvailable } from "./lib/ask";
@@ -88,7 +76,7 @@ async function getUserBiometricData(userId: string) {
 
 function notConnectedEmbed(): EmbedBuilder {
   return new EmbedBuilder()
-    .setTitle("⚠️ Device Not Connected")
+    .setTitle("Device Not Connected")
     .setDescription("Connect your wearable to use this feature.")
     .setColor(0xf59e0b)
     .addFields({
@@ -99,7 +87,7 @@ function notConnectedEmbed(): EmbedBuilder {
 }
 
 // ============================================
-// Command Handlers
+// Command Handlers (Claude-first architecture)
 // ============================================
 
 async function handleWorkout(interaction: ChatInputCommandInteraction) {
@@ -111,11 +99,9 @@ async function handleWorkout(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  const sport = parseSport(sportInput || undefined);
-  if (sportInput && !sport) {
-    const sportList = getSportList().join(", ");
+  if (!isAskAvailable()) {
     await interaction.reply({
-      content: `Unknown sport: "${sportInput}"\n\nSupported: ${sportList}`,
+      content: "Ask feature not configured. Server admin needs to set ANTHROPIC_API_KEY.",
       ephemeral: true,
     });
     return;
@@ -129,13 +115,15 @@ async function handleWorkout(interaction: ChatInputCommandInteraction) {
       await interaction.editReply({ embeds: [notConnectedEmbed()] });
       return;
     }
-    const decision = getWorkoutDecision(data, sport);
-    const embed = formatWorkoutEmbed(decision);
+    const question = sportInput
+      ? `Should I work out today? Sport: ${sportInput}`
+      : "Should I work out today?";
+    const embed = await getAskEmbed(question, data, `dc-${userId}`, eventStore);
     updateLastCheck(userId);
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error("Workout error:", error);
-    await interaction.editReply("❌ Error fetching your data. Try again later.");
+    await interaction.editReply("Error fetching your data. Try again later.");
   }
 }
 
@@ -158,38 +146,11 @@ async function handleDrink(interaction: ChatInputCommandInteraction) {
       });
       return;
     }
-    await interaction.deferReply();
-    try {
-      const data = await getUserBiometricData(userId);
-      if (!data) {
-        await interaction.editReply({ embeds: [notConnectedEmbed()] });
-        return;
-      }
-      addDrinkLog(userId, amount);
-      const decision = getDrinkDecision(data);
-      const impact = decision.impacts.find((i) => i.drinks === amount) ||
-        decision.impacts[decision.impacts.length - 1];
-
-      const embed = new EmbedBuilder()
-        .setTitle(`✅ Logged: ${amount} drink${amount > 1 ? "s" : ""}`)
-        .setColor(amount <= decision.greenLimit ? 0x22c55e : 0xf59e0b)
-        .addFields(
-          { name: "HRV Impact", value: impact.hrvDrop, inline: true },
-          { name: "Fatigue", value: impact.fatigue, inline: true },
-          { name: "Recovery", value: impact.recoveryTime, inline: true }
-        );
-
-      if (amount > decision.greenLimit) {
-        embed.setFooter({ text: "💤 Early bedtime will help recovery" });
-      } else {
-        embed.setFooter({ text: "👍 Within your safe limit - nice job!" });
-      }
-
-      await interaction.editReply({ embeds: [embed] });
-    } catch (error) {
-      console.error("Drink log error:", error);
-      await interaction.editReply("❌ Error logging drinks.");
-    }
+    addDrinkLog(userId, amount);
+    await interaction.reply({
+      content: `Logged: ${amount} drink${amount > 1 ? "s" : ""}`,
+      ephemeral: true,
+    });
     return;
   }
 
@@ -203,13 +164,29 @@ async function handleDrink(interaction: ChatInputCommandInteraction) {
       });
       return;
     }
-    const history = calculateDrinkHistory(logs);
-    const embed = formatDrinkHistoryEmbed(history);
+    const totalDrinks = logs.reduce((sum: number, l: DrinkLog) => sum + l.amount, 0);
+    const avgPerSession = logs.length > 0 ? (totalDrinks / logs.length).toFixed(1) : "0";
+    const embed = new EmbedBuilder()
+      .setTitle("Your Drinking History")
+      .setColor(0x3b82f6)
+      .addFields(
+        { name: "Sessions logged", value: `${logs.length}`, inline: true },
+        { name: "Total drinks", value: `${totalDrinks}`, inline: true },
+        { name: "Avg per session", value: avgPerSession, inline: true }
+      );
     await interaction.reply({ embeds: [embed] });
     return;
   }
 
-  // Handle social action
+  if (!isAskAvailable()) {
+    await interaction.reply({
+      content: "Ask feature not configured. Server admin needs to set ANTHROPIC_API_KEY.",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  // Handle social action - route through /ask
   if (action === "social") {
     await interaction.deferReply();
     try {
@@ -218,28 +195,21 @@ async function handleDrink(interaction: ChatInputCommandInteraction) {
         await interaction.editReply({ embeds: [notConnectedEmbed()] });
         return;
       }
-      const logs = getDrinkLogs(userId);
-      const history = logs.length > 0 ? calculateDrinkHistory(logs) : undefined;
-      const decision = getDrinkDecision(data, history);
-      const strategy = getSocialStrategy(decision);
-
-      const embed = new EmbedBuilder()
-        .setTitle(`🍻 ${strategy.headline}`)
-        .setColor(0x3b82f6)
-        .addFields(
-          { name: "Tonight's Max", value: `${strategy.limit} drinks`, inline: true },
-          { name: "Strategy", value: strategy.tips.map((t, i) => `${i + 1}. ${t}`).join("\n"), inline: false }
-        );
-
+      const embed = await getAskEmbed(
+        "I have a social event tonight. How many drinks can I have and what's my strategy?",
+        data,
+        `dc-${userId}`,
+        eventStore
+      );
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {
       console.error("Drink social error:", error);
-      await interaction.editReply("❌ Error getting strategy.");
+      await interaction.editReply("Error getting strategy.");
     }
     return;
   }
 
-  // Default: show recommendation
+  // Default: show recommendation via /ask
   await interaction.deferReply();
   try {
     const data = await getUserBiometricData(userId);
@@ -247,15 +217,17 @@ async function handleDrink(interaction: ChatInputCommandInteraction) {
       await interaction.editReply({ embeds: [notConnectedEmbed()] });
       return;
     }
-    const logs = getDrinkLogs(userId);
-    const history = logs.length > 0 ? calculateDrinkHistory(logs) : undefined;
-    const decision = getDrinkDecision(data, history);
-    const embed = formatDrinkEmbed(decision);
+    const embed = await getAskEmbed(
+      "Should I drink alcohol tonight? What's my safe limit?",
+      data,
+      `dc-${userId}`,
+      eventStore
+    );
     updateLastCheck(userId);
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error("Drink error:", error);
-    await interaction.editReply("❌ Error fetching your data.");
+    await interaction.editReply("Error fetching your data.");
   }
 }
 
@@ -269,7 +241,13 @@ async function handleWhy(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  const userInput = parseWhyInput(`/why ${feeling || ""} ${score || ""}`);
+  if (!isAskAvailable()) {
+    await interaction.reply({
+      content: "Ask feature not configured. Server admin needs to set ANTHROPIC_API_KEY.",
+      ephemeral: true,
+    });
+    return;
+  }
 
   await interaction.deferReply();
 
@@ -279,13 +257,16 @@ async function handleWhy(interaction: ChatInputCommandInteraction) {
       await interaction.editReply({ embeds: [notConnectedEmbed()] });
       return;
     }
-    const decision = getWhyDecision(data, userInput);
-    const embed = formatWhyEmbed(decision);
+    const parts = ["Why do I feel this way?"];
+    if (feeling) parts.push(`I'm feeling: ${feeling}`);
+    if (score) parts.push(`My energy score: ${score}/10`);
+    const question = parts.join(" ");
+    const embed = await getAskEmbed(question, data, `dc-${userId}`, eventStore);
     updateLastCheck(userId);
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error("Why error:", error);
-    await interaction.editReply("❌ Error analyzing your data.");
+    await interaction.editReply("Error analyzing your data.");
   }
 }
 
@@ -307,7 +288,7 @@ async function handleMood(interaction: ChatInputCommandInteraction) {
   // Need score for mood logging
   if (!score) {
     await interaction.reply({
-      content: "**🎭 Mood Tracking**\n\nLog your mood (1-5):\n`/mood score:1` - Very low\n`/mood score:3` - Neutral\n`/mood score:5` - Great\n\nOr view patterns: `/mood action:View history`",
+      content: "**Mood Tracking**\n\nLog your mood (1-5):\n`/mood score:1` - Very low\n`/mood score:3` - Neutral\n`/mood score:5` - Great\n\nOr view patterns: `/mood action:View history`",
       ephemeral: true,
     });
     return;
@@ -316,7 +297,7 @@ async function handleMood(interaction: ChatInputCommandInteraction) {
   if (!hasConnectedDevice(userId)) {
     addMoodEntry(userId, score);
     await interaction.reply({
-      content: `✅ **Mood Logged: ${score}/5**\n\nConnect your device to get insights about why you feel this way.`,
+      content: `**Mood Logged: ${score}/5**\n\nConnect your device to get insights about why you feel this way.`,
       ephemeral: true,
     });
     return;
@@ -328,7 +309,7 @@ async function handleMood(interaction: ChatInputCommandInteraction) {
     const data = await getUserBiometricData(userId);
     if (!data) {
       addMoodEntry(userId, score);
-      await interaction.editReply(`✅ Mood logged: ${score}/5\n\nCouldn't fetch device data.`);
+      await interaction.editReply(`Mood logged: ${score}/5\n\nCouldn't fetch device data.`);
       return;
     }
 
@@ -347,7 +328,7 @@ async function handleMood(interaction: ChatInputCommandInteraction) {
   } catch (error) {
     console.error("Mood error:", error);
     addMoodEntry(userId, score);
-    await interaction.editReply(`✅ Mood logged: ${score}/5\n\nError analyzing data.`);
+    await interaction.editReply(`Mood logged: ${score}/5\n\nError analyzing data.`);
   }
 }
 
@@ -363,18 +344,18 @@ async function handleConnect(interaction: ChatInputCommandInteraction) {
     const isValid = await validateToken(token, device);
     if (!isValid) {
       await interaction.editReply(
-        `❌ **${displayName} Connection Failed**\n\nThe token appears to be invalid. Please check:\n1. You copied the full token\n2. The token hasn't expired`
+        `**${displayName} Connection Failed**\n\nThe token appears to be invalid. Please check:\n1. You copied the full token\n2. The token hasn't expired`
       );
       return;
     }
 
     setProvider(userId, device, token);
     await interaction.editReply(
-      `✅ **${displayName} Connected!**\n\nYou can now use /workout, /drink, /why, and /mood.`
+      `**${displayName} Connected!**\n\nYou can now use /workout, /drink, /why, and /mood.`
     );
   } catch (error) {
     console.error("Connect error:", error);
-    await interaction.editReply("❌ Connection failed. Please try again.");
+    await interaction.editReply("Connection failed. Please try again.");
   }
 }
 
@@ -382,7 +363,7 @@ async function handleDisconnect(interaction: ChatInputCommandInteraction) {
   const userId = interaction.user.id;
   setUser(userId, { provider: undefined, providerToken: undefined });
   await interaction.reply({
-    content: "🔓 **Device Disconnected**\n\nUse /connect to reconnect anytime.",
+    content: "**Device Disconnected**\n\nUse /connect to reconnect anytime.",
     ephemeral: true,
   });
 }
@@ -400,12 +381,12 @@ async function handleStatus(interaction: ChatInputCommandInteraction) {
       : "No checks yet";
 
     await interaction.reply({
-      content: `📊 **Status**\n\n${displayName}: ✅ Connected\n${lastCheck}\n\nReady to use /workout`,
+      content: `**Status**\n\n${displayName}: Connected\n${lastCheck}\n\nReady to use /workout`,
       ephemeral: true,
     });
   } else {
     await interaction.reply({
-      content: "📊 **Status**\n\nDevice: ❌ Not connected\n\nUse /connect to link your device.",
+      content: "**Status**\n\nDevice: Not connected\n\nUse /connect to link your device.",
       ephemeral: true,
     });
   }
@@ -421,13 +402,35 @@ async function handleDemo(interaction: ChatInputCommandInteraction) {
 
   switch (feature) {
     case "drink": {
-      const decision = getDrinkDecision(data);
-      embed = formatDrinkEmbed(decision);
+      if (isAskAvailable()) {
+        embed = await getAskEmbed(
+          "Should I drink alcohol tonight? What's my safe limit?",
+          data,
+          undefined,
+          undefined
+        );
+      } else {
+        embed = new EmbedBuilder()
+          .setTitle("Drink Demo")
+          .setDescription("Set ANTHROPIC_API_KEY to enable AI-powered drink recommendations.")
+          .setColor(0xf59e0b);
+      }
       break;
     }
     case "why": {
-      const decision = getWhyDecision(data);
-      embed = formatWhyEmbed(decision);
+      if (isAskAvailable()) {
+        embed = await getAskEmbed(
+          "Why do I feel this way? My energy score is 4/10.",
+          data,
+          undefined,
+          undefined
+        );
+      } else {
+        embed = new EmbedBuilder()
+          .setTitle("Why Demo")
+          .setDescription("Set ANTHROPIC_API_KEY to enable AI-powered analysis.")
+          .setColor(0xf59e0b);
+      }
       break;
     }
     case "mood": {
@@ -442,13 +445,24 @@ async function handleDemo(interaction: ChatInputCommandInteraction) {
       break;
     }
     default: {
-      const decision = getWorkoutDecision(data);
-      embed = formatWorkoutEmbed(decision);
+      if (isAskAvailable()) {
+        embed = await getAskEmbed(
+          "Should I work out today?",
+          data,
+          undefined,
+          undefined
+        );
+      } else {
+        embed = new EmbedBuilder()
+          .setTitle("Workout Demo")
+          .setDescription("Set ANTHROPIC_API_KEY to enable AI-powered workout recommendations.")
+          .setColor(0xf59e0b);
+      }
     }
   }
 
   embed.setFooter({
-    text: "📝 Demo data - Use /connect to see your real data",
+    text: "Demo data - Use /connect to see your real data",
   });
 
   await interaction.editReply({ embeds: [embed] });
@@ -491,7 +505,7 @@ async function handleCost(interaction: ChatInputCommandInteraction) {
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error("Cost error:", error);
-    await interaction.editReply("❌ Error calculating recovery cost.");
+    await interaction.editReply("Error calculating recovery cost.");
   }
 }
 
@@ -505,7 +519,7 @@ async function handleAsk(interaction: ChatInputCommandInteraction) {
 
   if (!isAskAvailable()) {
     await interaction.reply({
-      content: "⚠️ Ask feature not configured. Server admin needs to set ANTHROPIC_API_KEY.",
+      content: "Ask feature not configured. Server admin needs to set ANTHROPIC_API_KEY.",
       ephemeral: true,
     });
     return;
@@ -529,7 +543,7 @@ async function handleAsk(interaction: ChatInputCommandInteraction) {
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
     console.error("Ask error:", error);
-    await interaction.editReply("❌ Error processing your question. Try again.");
+    await interaction.editReply("Error processing your question. Try again.");
   }
 }
 
@@ -538,7 +552,7 @@ async function handleAsk(interaction: ChatInputCommandInteraction) {
 // ============================================
 
 client.once("ready", (c) => {
-  console.log(`✅ Discord bot ready: ${c.user.tag}`);
+  console.log(`Discord bot ready: ${c.user.tag}`);
   console.log("");
   console.log("Commands: /workout, /drink, /cost, /why, /mood, /ask, /connect, /demo");
   console.log("");
@@ -590,9 +604,9 @@ client.on("interactionCreate", async (interaction) => {
   } catch (error) {
     console.error(`Error handling /${commandName}:`, error);
     if (interaction.deferred || interaction.replied) {
-      await interaction.editReply("❌ An error occurred.");
+      await interaction.editReply("An error occurred.");
     } else {
-      await interaction.reply({ content: "❌ An error occurred.", ephemeral: true });
+      await interaction.reply({ content: "An error occurred.", ephemeral: true });
     }
   }
 });
@@ -631,7 +645,7 @@ function scheduleCronJobs() {
 
       // Resolve pending outcomes (24h+ old without outcome)
       const resolved = await resolveOutcomes(eventStore, userId, data);
-      console.log(`[cron] ✅ Resolved ${resolved} pending outcomes for ${userId}`);
+      console.log(`[cron] Resolved ${resolved} pending outcomes for ${userId}`);
 
       // Check if we have 5+ events to build a profile
       const events = await eventStore.getByUser(userId, 100);
@@ -642,7 +656,7 @@ function scheduleCronJobs() {
           try {
             const profile = buildCausalityProfile(userId, events);
             await profileStore.saveProfile(profile);
-            console.log(`[cron] ✅ Generated CausalityProfile for ${userId} (${events.length} events)`);
+            console.log(`[cron] Generated CausalityProfile for ${userId} (${events.length} events)`);
             console.log(`[cron]    - Personal HRV sensitivity: ${profile.personalConstants.alcoholHrvDropPerDrink}%`);
             console.log(`[cron]    - Personal drink limit: ${profile.personalConstants.personalDrinkLimit} drinks`);
           } catch (err) {
@@ -656,11 +670,11 @@ function scheduleCronJobs() {
     }
   });
 
-  console.log("[cron] ✅ Cron job scheduled: Daily outcome resolution at 00:00 UTC (09:00 KST)");
+  console.log("[cron] Cron job scheduled: Daily outcome resolution at 00:00 UTC (09:00 KST)");
 }
 
 // Start bot
-process.stdout.write("🤖 P360 Discord Bot starting...\n");
+process.stdout.write("P360 Discord Bot starting...\n");
 process.stdout.write("[cron] Initializing cron scheduling...\n");
 scheduleCronJobs();
 process.stdout.write("[cron] Cron initialization complete\n");

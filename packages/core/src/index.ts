@@ -46,66 +46,10 @@ export {
 } from "./algorithm";
 
 // ============================================
-// Workout
+// Domain Logic (drink, workout, why) — REMOVED
+// Claude-first architecture: Claude handles all domain reasoning
+// See advisor.ts buildSystemPrompt() for domain guidance
 // ============================================
-
-export type {
-  WorkoutVerdict,
-  WorkoutDecision,
-  Sport,
-  SportGuide,
-  IntensityGuide,
-} from "./workout";
-
-export {
-  getWorkoutDecision,
-  getSportGuide,
-  parseSport,
-  getSportList,
-  formatWorkoutCLI,
-  formatWorkoutJSON,
-  getVerdictEmoji as getWorkoutVerdictEmoji,
-  getVerdictColor as getWorkoutVerdictColor,
-} from "./workout";
-
-// ============================================
-// Drink
-// ============================================
-
-export type {
-  DrinkLog,
-  DrinkVerdict,
-  DrinkImpact,
-  DrinkDecision,
-  DrinkHistory,
-  SocialStrategy,
-} from "./drink";
-
-export {
-  getDrinkDecision,
-  getSocialStrategy,
-  calculateDrinkHistory,
-} from "./drink";
-
-// ============================================
-// Why (Mind vs Body Analysis)
-// ============================================
-
-export type {
-  WhyCategory,
-  WhyVerdict,
-  GapDirection,
-  WhyUserInput,
-  GapAnalysis,
-  WhyDataSummary,
-  WhyDecision,
-} from "./why";
-
-export {
-  getWhyDecision,
-  parseWhyInput,
-  analyzeGap,
-} from "./why";
 
 // ============================================
 // Mood (P17 - Recovery → Mood Attribution)
@@ -161,44 +105,24 @@ export {
 } from "./advisor";
 
 // ============================================
-// Causality Engine (개인별 인과관계 독점 자산)
+// Causality Engine (Phase 1: types + collectEvent pipeline only)
+// Phase 2에서 개별 분석 함수 활성화 예정
 // ============================================
 
 export type {
-  CausalityDomain,
-  CausalityAction,
-  CausalityRecommendation,
-  CausalityEvent,
-  CausalityOutcome,
-  BiometricSnapshot,
-  PersonalPattern,
-  PersonalConstants,
   CausalityProfile,
   EventStore,
 } from "./causality";
 
-export {
-  toBiometricSnapshot,
-  calculateDelta,
-} from "./causality";
+// Phase 2 pipeline: apps cron job에서 사용 중
+export { resolveOutcomes } from "./causality-collector";
+export { buildCausalityProfile } from "./causality-analyzer";
 
-export {
-  InMemoryEventStore,
-  extractEventFromAsk,
-  resolveOutcomes,
-} from "./causality-collector";
-
-export {
-  linearRegression,
-  analyzeAlcoholSensitivity,
-  analyzeAlcoholRecovery,
-  analyzeCaffeineSensitivity,
-  analyzeWorkoutRecovery,
-  analyzePersonalDrinkLimit,
-  buildCausalityProfile,
-} from "./causality-analyzer";
-
-export type { RegressionResult } from "./causality-analyzer";
+// Phase 2: 개별 분석/수집 함수 (현재 앱에서 미사용)
+// export type { CausalityDomain, CausalityAction, ... } from "./causality";
+// export { InMemoryEventStore } from "./causality-collector";
+// export { linearRegression, analyzeAlcoholSensitivity, ... } from "./causality-analyzer";
+// export type { RegressionResult } from "./causality-analyzer";
 
 // ============================================
 // Ask Gateway (unified ask pipeline)
@@ -220,24 +144,16 @@ export {
 } from "./ask-gateway";
 
 // ============================================
-// Supabase Event Store
+// Supabase Stores (Phase 2: 앱에서 사용 중, factory만 export)
 // ============================================
 
-export {
-  SupabaseEventStore,
-  createSupabaseEventStore,
-} from "./supabase-event-store";
+export { createSupabaseEventStore } from "./supabase-event-store";
+export { createSupabaseProfileStore } from "./supabase-profile-store";
 
-// ============================================
-// Supabase Profile Store
-// ============================================
-
-export type { ProfileStore } from "./supabase-profile-store";
-
-export {
-  SupabaseProfileStore,
-  createSupabaseProfileStore,
-} from "./supabase-profile-store";
+// Phase 2: 클래스/인터페이스 직접 export (현재 앱에서 미사용)
+// export { SupabaseEventStore } from "./supabase-event-store";
+// export type { ProfileStore } from "./supabase-profile-store";
+// export { SupabaseProfileStore } from "./supabase-profile-store";
 
 // ============================================
 // Time-Series Analysis

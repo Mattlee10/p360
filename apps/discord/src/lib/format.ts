@@ -1,10 +1,6 @@
 import { EmbedBuilder } from "discord.js";
 import type {
-  WorkoutDecision,
-  DrinkDecision,
-  WhyDecision,
   MoodDecision,
-  DrinkHistory,
   MoodInsight,
   RecoveryCost,
 } from "@p360/core";
@@ -17,213 +13,6 @@ const COLORS = {
   blue: 0x3b82f6, // Info
   purple: 0x8b5cf6, // Mood
 };
-
-function getVerdictColor(verdict: string): number {
-  switch (verdict) {
-    case "train_hard":
-    case "good":
-    case "proceed":
-      return COLORS.green;
-    case "moderate":
-    case "train_light":
-    case "caution":
-    case "wait":
-      return COLORS.amber;
-    case "rest":
-    case "skip":
-    case "stop":
-      return COLORS.red;
-    default:
-      return COLORS.blue;
-  }
-}
-
-// ============================================
-// Workout Embed
-// ============================================
-
-export function formatWorkoutEmbed(decision: WorkoutDecision): EmbedBuilder {
-  const { dataSummary } = decision;
-
-  const embed = new EmbedBuilder()
-    .setTitle(`${decision.emoji} ${decision.headline}`)
-    .setDescription(decision.subheadline)
-    .setColor(getVerdictColor(decision.verdict))
-    .addFields(
-      {
-        name: "📊 Readiness",
-        value: `${dataSummary.readiness.value ?? "?"}/100`,
-        inline: true,
-      },
-      {
-        name: "💓 HRV",
-        value: dataSummary.hrv.trend,
-        inline: true,
-      },
-      {
-        name: "😴 Sleep",
-        value: `${dataSummary.sleep.value ?? "?"}/100`,
-        inline: true,
-      }
-    );
-
-  // Reasoning
-  if (decision.reasoning.length > 0) {
-    embed.addFields({
-      name: "📋 Why",
-      value: decision.reasoning.map((r) => `• ${r}`).join("\n"),
-      inline: false,
-    });
-  }
-
-  // Intensity guide
-  const intensityParts: string[] = [];
-  if (decision.intensityGuide.cardio) {
-    intensityParts.push(`Cardio: ${decision.intensityGuide.cardio}`);
-  }
-  if (decision.intensityGuide.weights) {
-    intensityParts.push(`Weights: ${decision.intensityGuide.weights}`);
-  }
-  if (decision.intensityGuide.rpe) {
-    intensityParts.push(`Effort: ${decision.intensityGuide.rpe}`);
-  }
-  if (intensityParts.length > 0) {
-    embed.addFields({
-      name: "🎯 Intensity",
-      value: intensityParts.join("\n"),
-      inline: false,
-    });
-  }
-
-  // Sport guide
-  if (decision.sportGuide) {
-    const sg = decision.sportGuide;
-    let sportText = sg.todayAdvice;
-    if (sg.intensityTips.length > 0) {
-      sportText += "\n" + sg.intensityTips.slice(0, 2).map((t) => `• ${t}`).join("\n");
-    }
-    embed.addFields({
-      name: `🏀 ${sg.displayName}`,
-      value: sportText,
-      inline: false,
-    });
-  }
-
-  embed.setFooter({ text: `Tomorrow: ${decision.tomorrowOutlook}` });
-
-  return embed;
-}
-
-// ============================================
-// Drink Embed
-// ============================================
-
-export function formatDrinkEmbed(decision: DrinkDecision): EmbedBuilder {
-  const { dataSummary } = decision;
-
-  const embed = new EmbedBuilder()
-    .setTitle(`${decision.emoji} ${decision.headline}`)
-    .setDescription(decision.subheadline)
-    .setColor(getVerdictColor(decision.verdict))
-    .addFields(
-      {
-        name: "📊 Readiness",
-        value: `${dataSummary.readiness.value ?? "?"}/100`,
-        inline: true,
-      },
-      {
-        name: "💓 HRV",
-        value: dataSummary.hrv.trend,
-        inline: true,
-      },
-      {
-        name: "😴 Sleep",
-        value: `${dataSummary.sleep.value ?? "?"}/100`,
-        inline: true,
-      }
-    );
-
-  // Limits
-  embed.addFields({
-    name: "🍺 Tonight's Limits",
-    value: [
-      `🟢 ${decision.greenLimit} drinks: ${decision.impacts[decision.greenLimit - 1]?.recoveryTime || "normal tomorrow"}`,
-      `🟡 ${decision.yellowLimit} drinks: ${decision.impacts[decision.yellowLimit - 1]?.recoveryTime || "afternoon recovery"}`,
-      `🔴 ${decision.redThreshold}+ drinks: ${decision.impacts[Math.min(decision.redThreshold, 4)]?.recoveryTime || "multi-day recovery"}`,
-    ].join("\n"),
-    inline: false,
-  });
-
-  // Tips
-  if (decision.tips.length > 0) {
-    embed.addFields({
-      name: "💡 Tips",
-      value: decision.tips.slice(0, 3).map((t) => `• ${t}`).join("\n"),
-      inline: false,
-    });
-  }
-
-  return embed;
-}
-
-// ============================================
-// Why Embed
-// ============================================
-
-export function formatWhyEmbed(decision: WhyDecision): EmbedBuilder {
-  const { dataSummary } = decision;
-
-  const embed = new EmbedBuilder()
-    .setTitle(`${decision.emoji} ${decision.headline}`)
-    .setDescription(decision.subheadline)
-    .setColor(decision.verdict === "physiological" ? COLORS.amber : COLORS.blue)
-    .addFields(
-      {
-        name: "📊 Readiness",
-        value: `${dataSummary.readiness.value ?? "?"} (${dataSummary.readiness.status})`,
-        inline: true,
-      },
-      {
-        name: "💓 HRV",
-        value: dataSummary.hrv.trend,
-        inline: true,
-      },
-      {
-        name: "😴 Sleep",
-        value: `${dataSummary.sleep.value ?? "?"}`,
-        inline: true,
-      }
-    );
-
-  // Gap analysis
-  if (decision.gapAnalysis) {
-    embed.addFields({
-      name: "🔍 Gap Analysis",
-      value: `You feel: ${decision.gapAnalysis.subjectiveScore}/10\nBody says: ${decision.gapAnalysis.objectiveScore}/10\n${decision.gapAnalysis.explanation.split("\n")[0]}`,
-      inline: false,
-    });
-  }
-
-  // Explanation
-  embed.addFields({
-    name: "💡 Why You Feel This Way",
-    value: decision.explanation.split("\n").slice(0, 3).join("\n"),
-    inline: false,
-  });
-
-  // Recommendations
-  embed.addFields({
-    name: "🎯 What to Do",
-    value: decision.recommendations.slice(0, 4).map((r) => `• ${r}`).join("\n"),
-    inline: false,
-  });
-
-  if (decision.verdict !== "psychological") {
-    embed.setFooter({ text: `⚠️ ${decision.risk}` });
-  }
-
-  return embed;
-}
 
 // ============================================
 // Mood Embed
@@ -238,12 +27,12 @@ export function formatMoodEmbed(decision: MoodDecision): EmbedBuilder {
     .setColor(attribution.isPhysiological ? COLORS.amber : COLORS.purple)
     .addFields(
       {
-        name: "📊 Recovery",
+        name: "Recovery",
         value: `${dataSummary.readiness ?? "?"} (${dataSummary.recoveryStatus})`,
         inline: true,
       },
       {
-        name: "🎭 Mood",
+        name: "Mood",
         value: `${dataSummary.moodScore}/5 (${dataSummary.moodStatus})`,
         inline: true,
       }
@@ -251,21 +40,21 @@ export function formatMoodEmbed(decision: MoodDecision): EmbedBuilder {
 
   // Explanation
   embed.addFields({
-    name: "💡 What's Happening",
+    name: "What's Happening",
     value: attribution.explanation.split("\n").filter((l) => l.trim()).slice(0, 3).join("\n"),
     inline: false,
   });
 
   // Recommendations
   embed.addFields({
-    name: "🎯 What to Do",
+    name: "What to Do",
     value: attribution.recommendations.slice(0, 4).map((r) => `• ${r}`).join("\n"),
     inline: false,
   });
 
   if (decision.scenario === "A") {
     embed.setFooter({
-      text: "⚡ This is NOT a personal failing. Your body needs rest.",
+      text: "This is NOT a personal failing. Your body needs rest.",
     });
   }
 
@@ -274,13 +63,13 @@ export function formatMoodEmbed(decision: MoodDecision): EmbedBuilder {
 
 export function formatMoodHistoryEmbed(insight: MoodInsight): EmbedBuilder {
   const embed = new EmbedBuilder()
-    .setTitle("📈 Your Mood-Recovery Pattern")
+    .setTitle("Your Mood-Recovery Pattern")
     .setColor(COLORS.purple);
 
   if (insight.trend === "insufficient_data") {
     embed.setDescription(insight.summary);
     embed.addFields({
-      name: "💡 Tip",
+      name: "Tip",
       value: insight.insight,
       inline: false,
     });
@@ -298,45 +87,8 @@ export function formatMoodHistoryEmbed(insight: MoodInsight): EmbedBuilder {
       }
     );
     embed.addFields({
-      name: "💡 Your Pattern",
+      name: "Your Pattern",
       value: insight.insight,
-      inline: false,
-    });
-  }
-
-  return embed;
-}
-
-// ============================================
-// Drink History Embed
-// ============================================
-
-export function formatDrinkHistoryEmbed(history: DrinkHistory): EmbedBuilder {
-  const embed = new EmbedBuilder()
-    .setTitle("📈 Your Drinking Patterns")
-    .setColor(COLORS.blue)
-    .addFields(
-      {
-        name: "Last 30 Days",
-        value: `Avg per week: ${history.avgPerWeek.toFixed(1)} sessions\nAvg per session: ${history.avgPerSession.toFixed(1)} drinks`,
-        inline: false,
-      }
-    );
-
-  if (history.patterns.length > 0) {
-    embed.addFields({
-      name: "Impact Patterns",
-      value: history.patterns
-        .map((p) => `${p.drinks} drinks → HRV -${p.avgHrvDrop}%, ${p.avgRecoveryDays}d recovery`)
-        .join("\n"),
-      inline: false,
-    });
-  }
-
-  if (history.personalSafeLimit) {
-    embed.addFields({
-      name: "🎯 Your Safe Limit",
-      value: `${history.personalSafeLimit} drinks\n*(Based on your personal data)*`,
       inline: false,
     });
   }
@@ -364,17 +116,17 @@ export function formatCostEmbed(cost: RecoveryCost): EmbedBuilder {
     .setColor(color)
     .addFields(
       {
-        name: "📊 Readiness",
+        name: "Readiness",
         value: `${dataSummary.readiness.value ?? "?"}/100`,
         inline: true,
       },
       {
-        name: "💓 HRV",
+        name: "HRV",
         value: dataSummary.hrv.trend,
         inline: true,
       },
       {
-        name: "😴 Sleep",
+        name: "Sleep",
         value: `${dataSummary.sleep.value ?? "?"}/100`,
         inline: true,
       }
@@ -392,7 +144,7 @@ export function formatCostEmbed(cost: RecoveryCost): EmbedBuilder {
       .join("\n");
 
     embed.addFields({
-      name: "📅 Day-by-Day Forecast",
+      name: "Day-by-Day Forecast",
       value: timelineText,
       inline: false,
     });

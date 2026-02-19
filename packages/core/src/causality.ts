@@ -1,7 +1,8 @@
 /**
- * Causality Engine — 개인별 인과관계 데이터 독점 자산
+ * PHASE 2 — Types만 Phase 1에서 사용 (CausalityProfile, EventStore)
  *
- * /ask 파이프라인에서 자동 수집 → 패턴 발견 → 알고리즘 개인화
+ * 개인별 인과관계 데이터 독점 자산
+ * Phase 2 활성화 시점: 3명 이상 active users 확보 후
  *
  * Flow:
  * 1. 유저가 /ask "맥주 3잔 마셔도 돼?" →
