@@ -4,8 +4,8 @@
   "description": "Bio-data driven decision support",
   "private": true,
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "packages/core",
+    "apps/telegram"
   ],
   "scripts": {
     "install-all": "npm install && npm install --workspace=apps/telegram --workspace=apps/discord --workspace=packages/core",
