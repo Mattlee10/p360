@@ -2,25 +2,14 @@ import { Context } from "grammy";
 import type { ProviderType } from "@p360/core";
 import { MESSAGES } from "./messages";
 import {
-  getOuraToken,
-  setOuraToken,
   getUser,
   setUser,
   updateLastCheck,
-  addDrinkLog,
-  getDrinkLogs,
-  getBotStats,
-  getCommandCounts,
   incrementCommandCount,
   setProvider,
   getProvider,
   getProviderToken,
   hasConnectedDevice,
-  addMoodEntry,
-  getMoodEntries,
-  getTodayMoodEntry,
-  addRecoveryScore,
-  getRecoveryHistory,
 } from "../lib/storage";
 import {
   fetchBiometricData,
@@ -28,21 +17,6 @@ import {
   getRandomDemoData,
   getProviderDisplayName,
 } from "../lib/data";
-import {
-  getMoodDecision,
-  calculateMoodInsight,
-} from "@p360/core";
-import {
-  getRecoveryCost,
-  parseSubstance,
-  getSubstanceList,
-} from "@p360/core";
-import { formatCostTelegram } from "../lib/cost";
-import {
-  formatMoodTelegram,
-  formatMoodHistoryTelegram,
-  formatMoodLoggedTelegram,
-} from "../lib/mood";
 import { getAskResponse, isAskAvailable } from "../lib/ask";
 import { createSupabaseEventStore } from "@p360/core";
 
@@ -210,294 +184,31 @@ export async function handleStatus(ctx: Context) {
   await reply(ctx, MESSAGES.status(connected, user?.lastCheckAt, provider));
 }
 
-// ============================================
-// Domain Commands → Claude-first via /ask pipeline
-// ============================================
-
-// /workout command → Claude handles workout reasoning
-export async function handleWorkout(ctx: Context) {
+// /ask command - universal question handler
+export async function handleAsk(ctx: Context) {
   const text = ctx.message?.text || "";
-  const sportInput = text.replace(/^\/workout\s*/i, "").trim();
-  const question = sportInput
-    ? `Should I do ${sportInput} today? What intensity and duration?`
-    : "Should I work out today? What intensity?";
-  await routeThroughAsk(ctx, question, "workout");
+  const question = text.replace(/^\/ask\s*/i, "").trim();
+
+  if (!question) {
+    await reply(ctx, `💬 <b>Ask anything!</b>\n\nExamples:\n• /ask Should I work out today?\n• /ask How much can I drink tonight?\n• /ask Why am I so tired?\n• /ask Is now a good time to start coding?`);
+    return;
+  }
+
+  await routeThroughAsk(ctx, question, "ask");
 }
 
-// /demo command → workout demo via Claude
+// /demo command - try without device connection
 export async function handleDemo(ctx: Context) {
   const text = ctx.message?.text || "";
-  const sportInput = text.replace(/^\/demo\s*/i, "").trim();
-  const question = sportInput
-    ? `Should I do ${sportInput} today? What intensity and duration?`
-    : "Should I work out today? What intensity?";
+  const question = text.replace(/^\/demo\s*/i, "").trim();
+
+  if (!question) {
+    await reply(ctx, `📝 <b>Try a demo question!</b>\n\nUsage: /demo [your question]\n\nExamples:\n• /demo Should I work out today?\n• /demo How much can I drink tonight?\n• /demo Why am I feeling tired?`);
+    return;
+  }
+
   await routeThroughAsk(ctx, question, "demo", true);
 }
-
-// /sports command - list available sports (still useful)
-export async function handleSports(ctx: Context) {
-  const sports = [
-    "basketball", "running", "cycling", "weightlifting", "crossfit",
-    "swimming", "yoga", "soccer", "tennis", "golf", "hiking", "climbing",
-    "martial arts",
-  ];
-  const formatted = sports.map((s) => `• ${s}`).join("\n");
-  await reply(
-    ctx,
-    `<b>🏀 Available Sports</b>\n\n${formatted}\n\n<b>Usage:</b>\n/workout basketball\n/workout running\n/workout bjj`
-  );
-}
-
-// /drink command → Claude handles drink reasoning
-export async function handleDrink(ctx: Context) {
-  const telegramId = ctx.from?.id;
-  if (!telegramId) return;
-
-  const text = ctx.message?.text || "";
-  const parts = text.split(" ");
-
-  // /drink log N — still record locally
-  if (parts.length > 1 && parts[1].toLowerCase() === "log") {
-    const amount = parseInt(parts[2], 10);
-    if (isNaN(amount) || amount < 1 || amount > 20) {
-      await reply(ctx, `⚠️ Please specify a valid number of drinks (1-20)\n\nExample: /drink log 3`);
-      return;
-    }
-    addDrinkLog(telegramId, amount);
-    await reply(ctx, `✅ <b>Logged: ${amount} drink${amount > 1 ? "s" : ""}</b>\n\nUse /ask to check tomorrow's impact.`);
-    return;
-  }
-
-  // /drink history — show logged history
-  if (parts.length > 1 && parts[1].toLowerCase() === "history") {
-    const logs = getDrinkLogs(telegramId);
-    if (logs.length === 0) {
-      await reply(ctx, `📊 <b>No Drinking History</b>\n\nStart logging with /drink log N.\n\nExample: /drink log 3`);
-      return;
-    }
-    const lines = ["📈 <b>Recent Drinking History</b>\n"];
-    logs.slice(-10).reverse().forEach((log) => {
-      lines.push(`  ${log.date}: ${log.amount} drinks`);
-    });
-    await reply(ctx, lines.join("\n"));
-    return;
-  }
-
-  // Default: /drink → Claude-powered drink advice
-  const question = "Should I drink alcohol tonight? What's my safe limit and what's the recovery cost?";
-  await routeThroughAsk(ctx, question, "drink");
-}
-
-// /drink demo
-export async function handleDrinkDemo(ctx: Context) {
-  const question = "Should I drink alcohol tonight? What's my safe limit and recovery cost?";
-  await routeThroughAsk(ctx, question, "drinkdemo", true);
-}
-
-// /why command → Claude handles fatigue reasoning
-export async function handleWhy(ctx: Context) {
-  const text = ctx.message?.text || "";
-  const userInput = text.replace(/^\/why\s*/i, "").trim();
-  const question = userInput
-    ? `I'm feeling: ${userInput}. Is this physiological or psychological? What should I do?`
-    : "Why am I feeling tired? Is it my body or my mind?";
-  await routeThroughAsk(ctx, question, "why");
-}
-
-// /why demo
-export async function handleWhyDemo(ctx: Context) {
-  const text = ctx.message?.text || "";
-  const userInput = text.replace(/^\/whydemo\s*/i, "").trim();
-  const question = userInput
-    ? `I'm feeling: ${userInput}. Is this physiological or psychological? What should I do?`
-    : "Why am I feeling tired? Is it my body or my mind?";
-  await routeThroughAsk(ctx, question, "whydemo", true);
-}
-
-// /feedback command - collect user feedback
-const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
-
-export async function handleFeedback(ctx: Context) {
-  const telegramId = ctx.from?.id;
-  const username = ctx.from?.username || "unknown";
-
-  const text = ctx.message?.text || "";
-  const feedbackText = text.replace(/^\/feedback\s*/i, "").trim();
-
-  if (!feedbackText) {
-    await reply(
-      ctx,
-      `📝 <b>Send us feedback!</b>\n\nUsage: /feedback [your message]\n\nExample:\n/feedback I'd love to see Pilates added as a sport!`
-    );
-    return;
-  }
-
-  console.log(`📬 FEEDBACK from @${username} (${telegramId}): ${feedbackText}`);
-
-  if (ADMIN_CHAT_ID && ctx.api) {
-    try {
-      await ctx.api.sendMessage(
-        ADMIN_CHAT_ID,
-        `📬 <b>New Feedback</b>\n\nFrom: @${username} (${telegramId})\n\n${feedbackText}`,
-        { parse_mode: "HTML" }
-      );
-    } catch (e) {
-      console.error("Failed to send feedback to admin:", e);
-    }
-  }
-
-  await reply(
-    ctx,
-    `✅ <b>Thanks for your feedback!</b>\n\nWe read every message and it helps us improve. 🙏`
-  );
-}
-
-// /stats command - admin only
-export async function handleStats(ctx: Context) {
-  const telegramId = ctx.from?.id;
-
-  if (!ADMIN_CHAT_ID || String(telegramId) !== ADMIN_CHAT_ID) {
-    await reply(ctx, `❓ Unknown command. Try /help to see available commands.`);
-    return;
-  }
-
-  const stats = getBotStats();
-  const counts = getCommandCounts();
-  const uptime = process.uptime();
-  const uptimeHours = Math.floor(uptime / 3600);
-  const uptimeMinutes = Math.floor((uptime % 3600) / 60);
-
-  const message = `
-📊 <b>Bot Stats</b>
-
-<b>Users</b>
-• Total: ${stats.totalUsers}
-• Connected: ${stats.connectedUsers}
-• Today new: ${stats.todayNewUsers}
-
-<b>Commands (since restart)</b>
-• /workout: ${counts.workout}
-• /drink: ${counts.drink}
-• /why: ${counts.why}
-• /ask: ${counts.ask}
-• /cost: ${counts.cost}
-• /demo: ${counts.demo}
-
-<b>Server</b>
-• Uptime: ${uptimeHours}h ${uptimeMinutes}m
-`.trim();
-
-  await reply(ctx, message);
-}
-
-// ============================================
-// Mood Commands (P17) — kept as-is (independent module)
-// ============================================
-
-export async function handleMood(ctx: Context) {
-  const telegramId = ctx.from?.id;
-  if (!telegramId) return;
-
-  const text = ctx.message?.text || "";
-  const parts = text.split(" ").filter((p) => p.trim());
-
-  if (parts.length < 2) {
-    await reply(
-      ctx,
-      `🎭 <b>Mood Tracking</b>
-
-Log how you're feeling (1-5):
-<code>/mood 1</code> - Very low
-<code>/mood 2</code> - Low
-<code>/mood 3</code> - Neutral
-<code>/mood 4</code> - Good
-<code>/mood 5</code> - Great
-
-Other commands:
-/mood history - See your mood-recovery patterns
-/mooddemo - Try with demo data`
-    );
-    return;
-  }
-
-  const subcommand = parts[1].toLowerCase();
-
-  if (subcommand === "history" || subcommand === "insight") {
-    const moodEntries = getMoodEntries(telegramId);
-    const recoveryHistory = getRecoveryHistory(telegramId);
-    const insight = calculateMoodInsight(moodEntries, recoveryHistory);
-    const message = formatMoodHistoryTelegram(insight);
-    await reply(ctx, message);
-    return;
-  }
-
-  const score = parseInt(subcommand, 10);
-  if (isNaN(score) || score < 1 || score > 5) {
-    await reply(ctx, `⚠️ Please enter a mood score from 1 to 5.\n\nExample: /mood 3\n\n1 = Very low, 5 = Great`);
-    return;
-  }
-
-  if (!hasConnectedDevice(telegramId)) {
-    addMoodEntry(telegramId, score);
-    await reply(
-      ctx,
-      `✅ <b>Mood Logged: ${score}/5</b>\n\nConnect your device to get insights about why you feel this way.\n/connect TOKEN (Oura) or /connect whoop TOKEN`
-    );
-    return;
-  }
-
-  try {
-    const data = await getUserBiometricData(telegramId);
-    if (!data) {
-      addMoodEntry(telegramId, score);
-      await reply(ctx, `✅ Mood logged: ${score}/5\n\nCouldn't fetch device data for analysis.`);
-      return;
-    }
-
-    if (data.readinessScore !== null) {
-      addRecoveryScore(telegramId, data.readinessScore);
-    }
-
-    const moodEntries = getMoodEntries(telegramId);
-    const recoveryHistory = getRecoveryHistory(telegramId);
-    const decision = getMoodDecision(data, score, moodEntries, recoveryHistory);
-    addMoodEntry(telegramId, score);
-
-    const message = formatMoodTelegram(decision);
-    await reply(ctx, message);
-  } catch (error) {
-    console.error("Mood check error:", error);
-    addMoodEntry(telegramId, score);
-    await reply(ctx, `✅ Mood logged: ${score}/5\n\nError analyzing data, but your mood was saved.`);
-  }
-}
-
-export async function handleMoodDemo(ctx: Context) {
-  const telegramId = ctx.from?.id;
-  if (telegramId) {
-    setUser(telegramId, {});
-  }
-
-  console.log(`📊 /mooddemo from ${telegramId}`);
-
-  const text = ctx.message?.text || "";
-  const parts = text.split(" ").filter((p) => p.trim());
-
-  let score = Math.floor(Math.random() * 5) + 1;
-  if (parts.length >= 2) {
-    const parsed = parseInt(parts[1], 10);
-    if (!isNaN(parsed) && parsed >= 1 && parsed <= 5) {
-      score = parsed;
-    }
-  }
-
-  await ctx.reply("🎲 Generating random scenario...");
-
-  const data = getRandomDemoData();
-  const decision = getMoodDecision(data, score);
-  const message = formatMoodTelegram(decision);
-
-  const demoNote = `\n\n<i>📝 Demo: Mood ${score}/5 + random biometrics.\nUse /connect to see your real data.</i>`;
   await reply(ctx, message + demoNote);
 }
 
@@ -604,15 +315,16 @@ export async function handleCostDemo(ctx: Context) {
 // Ask Command (AI-powered - the main pipeline)
 // ============================================
 
+// /ask command - Claude-powered question handler
 export async function handleAsk(ctx: Context) {
   const telegramId = ctx.from?.id;
   if (!telegramId) return;
 
   incrementCommandCount("ask");
-  console.log(`📊 /ask from ${telegramId}`);
+  console.log(`💬 /ask from ${telegramId}`);
 
   if (!isAskAvailable()) {
-    await reply(ctx, "⚠️ <b>Ask feature not configured</b>\n\nServer admin needs to set ANTHROPIC_API_KEY.");
+    await reply(ctx, "⚠️ <b>Ask feature not available</b>\n\nAdmin needs to set ANTHROPIC_API_KEY.");
     return;
   }
 
@@ -625,24 +337,11 @@ export async function handleAsk(ctx: Context) {
   const question = text.replace(/^\/ask\s*/i, "").trim();
 
   if (!question) {
-    await reply(
-      ctx,
-      `💬 <b>Ask P360 Anything</b>
-
-Ask about your body state in any language.
-
-<b>Examples:</b>
-<code>/ask 회식인데 소주 몇 잔까지 괜찮아?</code>
-<code>/ask should I work out today?</code>
-<code>/ask 커피 지금 마셔도 되나?</code>
-<code>/ask I'm tired but need to keep working</code>
-
-<b>Demo:</b> /askdemo 오늘 운동해도 돼?`
-    );
+    await reply(ctx, `💬 <b>Ask anything about your health</b>\n\nExamples:\n• /ask Should I work out today?\n• /ask How much can I drink?\n• /ask Why am I tired?\n\nTry /demo first if you don't have a device connected.`);
     return;
   }
 
-  await ctx.reply("🔄 Analyzing your data...");
+  await ctx.reply("🔄 Analyzing...");
 
   try {
     const data = await getUserBiometricData(telegramId);
@@ -657,38 +356,38 @@ Ask about your body state in any language.
     await reply(ctx, message);
   } catch (error) {
     console.error("Ask error:", error);
-    await reply(ctx, "❌ Error processing your question. Try again.");
+    await reply(ctx, "❌ Error. Try again.");
   }
 }
 
+// /demo command - try without device
 export async function handleAskDemo(ctx: Context) {
   const telegramId = ctx.from?.id;
   if (telegramId) {
     setUser(telegramId, {});
   }
 
-  incrementCommandCount("askdemo");
-  console.log(`📊 /askdemo from ${telegramId}`);
+  console.log(`🎲 /demo from ${telegramId}`);
 
   if (!isAskAvailable()) {
-    await reply(ctx, "⚠️ <b>Ask feature not configured</b>\n\nServer admin needs to set ANTHROPIC_API_KEY.");
+    await reply(ctx, "⚠️ <b>Demo not available</b>\n\nAdmin needs to set ANTHROPIC_API_KEY.");
     return;
   }
 
   const text = ctx.message?.text || "";
-  const question = text.replace(/^\/askdemo\s*/i, "").trim() || "오늘 운동해도 돼?";
+  const question = text.replace(/^\/demo\s*/i, "").trim() || "Should I work out today?";
 
-  await ctx.reply("🎲 Generating with demo data...");
+  await ctx.reply("🎲 Demo mode...");
 
   try {
     const data = getRandomDemoData();
     const userId = telegramId ? `tg-${telegramId}` : "tg-demo";
     const message = await getAskResponse(question, data, userId, eventStore);
-    const demoNote = `\n\n<i>📝 This is demo data. Use /connect to see your real data.</i>`;
+    const demoNote = `\n\n<i>📝 Demo data. Use /connect to see your real biometrics.</i>`;
     await reply(ctx, message + demoNote);
   } catch (error) {
-    console.error("Ask demo error:", error);
-    await reply(ctx, "❌ Error processing your question. Try again.");
+    console.error("Demo error:", error);
+    await reply(ctx, "❌ Error. Try again.");
   }
 }
 

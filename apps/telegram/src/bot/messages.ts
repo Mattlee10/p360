@@ -12,92 +12,60 @@ function getProviderName(provider?: ProviderType): string {
 export const MESSAGES = {
   welcome: `👋 <b>Welcome to P360!</b>
 
-I help you make better decisions based on your wearable data.
+I help you make smarter decisions based on your biometric data.
 
-<b>Supported Devices:</b>
-⌚ Oura Ring
-⌚ WHOOP
+<b>How it works:</b>
+1. Connect your Oura Ring or WHOOP
+2. Ask me anything about your health & performance
+3. Get personalized, data-driven answers
 
-<b>What I can do:</b>
-🏋️ /workout - Should I train today?
-🍺 /drink - How much can I drink tonight?
-💰 /cost beer 3 - Recovery cost before you drink
-🧠 /why - Why do I feel this way?
-🎭 /mood - Track mood + get insight
+<b>Example questions:</b>
+• "Should I work out today?"
+• "How much can I drink tonight?"
+• "Is it a good time to start a project?"
+• "Why am I feeling tired?"
+• "What should I do about my sleep?"
 
-<b>Quick Start:</b>
-1. Get your device's access token
-2. Run /connect YOUR_TOKEN (Oura) or /connect whoop YOUR_TOKEN
-3. Ask me anytime!
-
-<b>Commands:</b>
-/workout - Training recommendation
-/drink - Drinking limit guide
-/why - Mind vs Body analysis
-/connect - Link your wearable
+<b>Get started:</b>
+/connect - Link your device
+/ask - Ask anything
 /demo - Try with sample data
 /help - Show all commands`,
 
-  help: `<b>P360 Commands</b>
+  help: `<b>📖 P360 Commands</b>
 
-🏋️ <b>Workout Check</b>
-/workout - Get your training recommendation
-/w - Shortcut for /workout
+<b>💬 Ask Questions (Everything goes through /ask)</b>
+/ask <question> - Ask anything about your health
+Examples:
+  /ask Should I work out today?
+  /ask How much can I drink tonight?
+  /ask Why am I so tired?
+  /ask Is now a good time to work?
 
-🍺 <b>Drink Guide</b>
-/drink - How much can I drink tonight?
-/d - Shortcut for /drink
-/drink log N - Log drinks (e.g. /drink log 3)
-/drink history - See your drinking patterns
-/drink social - Social event strategy
+<b>🎮 Try It First</b>
+/demo - Try /ask with sample data (no device needed)
 
-🧠 <b>Why (Mind vs Body)</b>
-/why - Why do I feel off today?
-/why tired 4 - With keyword + score (1-10)
-/why mood - Check mood category
-/why energy 3 - Check energy with score
-/why focus - Check focus/concentration
-
-💰 <b>Recovery Cost (P27)</b>
-/cost beer 3 - Recovery cost of 3 beers
-/cost coffee 2 - Sleep impact of 2 coffees
-/cost wine 1 - Recovery cost of 1 wine
-/c - Shortcut for /cost
-
-🎭 <b>Mood Tracking (P17)</b>
-/mood N - Log mood (1-5) + get insight
-/m - Shortcut for /mood
-/mood history - See mood-recovery patterns
-
-🔗 <b>Connection</b>
-/connect TOKEN - Link Oura Ring
-/connect whoop TOKEN - Link WHOOP
+<b>🔗 Device Connection</b>
+/connect - Link your Oura Ring or WHOOP
 /status - Check connection status
 /disconnect - Remove device connection
 
-🎮 <b>Demo</b>
-/demo - Try workout with sample data
-/drinkdemo - Try drink with sample data
-/whydemo - Try why with sample data
-/mooddemo - Try mood with sample data
-/costdemo - Try recovery cost simulator
-
-❓ <b>Help</b>
+<b>ℹ️ Help</b>
 /help - Show this message
 
-<b>How to get your token:</b>
+<b>How to connect your device:</b>
 
-<b>Oura:</b>
+<b>Oura Ring:</b>
 1. Go to cloud.ouraring.com
-2. Personal Access Tokens
-3. Create new token
-4. /connect YOUR_TOKEN
+2. Create a Personal Access Token
+3. Send: /connect YOUR_TOKEN
 
 <b>WHOOP:</b>
 1. Go to developer.whoop.com
-2. Create an app
-3. Get access token
-4. /connect whoop YOUR_TOKEN`,
+2. Get your access token
+3. Send: /connect whoop YOUR_TOKEN
+
+💡 <i>Pro tip: Start with /demo to see how it works!</i>`,
 
   connectInstructions: `🔐 <b>Connect Your Device</b>
 

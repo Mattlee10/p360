@@ -14,21 +14,8 @@ import {
   handleConnect,
   handleDisconnect,
   handleStatus,
-  handleWorkout,
-  handleSports,
-  handleDemo,
-  handleFeedback,
-  handleDrink,
-  handleDrinkDemo,
-  handleWhy,
-  handleWhyDemo,
-  handleMood,
-  handleMoodDemo,
-  handleCost,
-  handleCostDemo,
   handleAsk,
-  handleAskDemo,
-  handleStats,
+  handleDemo,
   handleUnknown,
 } from "./bot/handlers";
 
@@ -52,31 +39,20 @@ if (!BOT_TOKEN) {
 // Create bot instance
 const bot = new Bot(BOT_TOKEN);
 
-// Register command handlers
+// ============================================
+// Minimal Command Set (Claude-first)
+// ============================================
+
+// Essential commands
 bot.command("start", handleStart);
 bot.command("help", handleHelp);
-bot.command("connect", handleConnect);
-bot.command("disconnect", handleDisconnect);
-bot.command("status", handleStatus);
-bot.command("workout", handleWorkout);
-bot.command("w", handleWorkout); // shortcut
-bot.command("sports", handleSports);
-bot.command("demo", handleDemo);
-bot.command("feedback", handleFeedback);
-bot.command("drink", handleDrink);
-bot.command("d", handleDrink); // shortcut
-bot.command("drinkdemo", handleDrinkDemo);
-bot.command("why", handleWhy);
-bot.command("whydemo", handleWhyDemo);
-bot.command("mood", handleMood);
-bot.command("m", handleMood); // shortcut
-bot.command("mooddemo", handleMoodDemo);
-bot.command("cost", handleCost);
-bot.command("c", handleCost); // shortcut
-bot.command("costdemo", handleCostDemo);
 bot.command("ask", handleAsk);
-bot.command("askdemo", handleAskDemo);
-bot.command("stats", handleStats); // admin only
+bot.command("demo", handleDemo);
+
+// Device management
+bot.command("connect", handleConnect);
+bot.command("status", handleStatus);
+bot.command("disconnect", handleDisconnect);
 
 // Handle unknown commands
 bot.on("message:text", (ctx) => {
