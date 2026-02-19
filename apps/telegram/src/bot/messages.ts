@@ -83,9 +83,9 @@ Or try demo mode: /demo`,
 
   connectSuccess: (provider: ProviderType = "oura") => `✅ <b>${getProviderName(provider)} Connected!</b>
 
-You can now use /workout to check your training readiness.
+You're all set! Now you can ask me anything about your health and performance.
 
-Try it now: /workout`,
+Try it now: /ask Should I work out today?`,
 
   connectFailed: (provider: ProviderType = "oura") => `❌ <b>Connection Failed</b>
 
@@ -130,7 +130,7 @@ Try /demo for sample data`,
 ${deviceName}: ✅ Connected
 ${lastCheckText}
 
-Ready to use /workout`;
+Ready to ask questions! Try: /ask Should I work out today?`;
     }
     return `📊 <b>Status</b>
 
