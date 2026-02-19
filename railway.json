@@ -2,12 +2,12 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm run build-prod"
+    "buildCommand": "npm run build"
   },
   "deploy": {
     "numReplicas": 1,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 5,
-    "startCommand": "cd apps/telegram && npm start"
+    "startCommand": "node apps/telegram/dist/index.js"
   }
 }
