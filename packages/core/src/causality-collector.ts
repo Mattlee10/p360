@@ -139,25 +139,60 @@ function extractSubstance(question: string): string | undefined {
 
 function extractSport(question: string): string | undefined {
   const sportKeywords: Record<string, string> = {
+    "incline walk": "incline_walking", "incline walking": "incline_walking",
+    "incline treadmill": "incline_walking",
+    walking: "walking", walk: "walking", 걷기: "walking", 산책: "walking",
     basketball: "basketball", 농구: "basketball",
-    running: "running", 달리기: "running", 러닝: "running",
+    running: "running", 달리기: "running", 러닝: "running", jog: "running", jogging: "running",
     swimming: "swimming", 수영: "swimming",
-    cycling: "cycling", 자전거: "cycling",
+    cycling: "cycling", 자전거: "cycling", bike: "cycling", biking: "cycling",
     yoga: "yoga", 요가: "yoga",
     crossfit: "crossfit",
-    weightlifting: "weightlifting", 웨이트: "weightlifting",
-    soccer: "soccer", 축구: "soccer",
+    weightlifting: "weightlifting", 웨이트: "weightlifting", weights: "weightlifting", lifting: "weightlifting",
+    soccer: "soccer", 축구: "soccer", football: "soccer",
     tennis: "tennis", 테니스: "tennis",
     hiking: "hiking", 등산: "hiking",
     climbing: "climbing", 클라이밍: "climbing",
-    bjj: "martial_arts", 격투기: "martial_arts",
+    bjj: "martial_arts", 격투기: "martial_arts", boxing: "boxing", 복싱: "boxing",
     golf: "golf", 골프: "golf",
+    pilates: "pilates", 필라테스: "pilates",
+    stretch: "stretching", stretching: "stretching",
   };
 
   const lower = question.toLowerCase();
-  for (const [keyword, sport] of Object.entries(sportKeywords)) {
+  // Multi-word sports checked first (longer match wins)
+  const sortedKeywords = Object.entries(sportKeywords).sort(
+    ([a], [b]) => b.length - a.length
+  );
+  for (const [keyword, sport] of sortedKeywords) {
     if (lower.includes(keyword)) {
       return sport;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Extract exercise duration in minutes from question text
+ * Examples: "40min walk", "walked for 30 minutes", "1 hour run"
+ */
+function extractDuration(question: string): number | undefined {
+  const patterns = [
+    /(\d+)\s*(?:min(?:utes?)?|분)/i,           // "40min", "40 minutes", "40분"
+    /(\d+)\s*(?:hour|hr|시간)/i,               // "1 hour", "1hr", "1시간" → multiply ×60
+    /for\s+(\d+)\s*(?:min|minutes?)/i,         // "for 30 min"
+  ];
+
+  const lower = question.toLowerCase();
+  for (const pattern of patterns) {
+    const match = lower.match(pattern);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      // Detect if it's hours
+      if (/hour|hr|시간/.test(pattern.source)) {
+        return num * 60;
+      }
+      if (num >= 1 && num <= 360) return num;
     }
   }
   return undefined;
@@ -183,22 +218,35 @@ export function extractEventFromAsk(
   biometrics: BiometricData,
   userId: string,
 ): CausalityEvent | null {
-  // "general" only route = 구체적 행동 아님 → 수집 안 함
+  // Resolve effective routes: even if route is "general", capture exercise events.
+  // e.g. "My HRV is 212, I did incline walk" → routes=["tired"] → still save as workout
+  let effectiveRoutes = routes;
   if (routes.length === 1 && routes[0] === "general") {
-    return null;
+    if (extractSport(question) !== undefined) {
+      effectiveRoutes = ["workout"];
+    } else {
+      return null;
+    }
   }
 
-  const domain = mapRouteToDomain(routes[0]);
-  const action = buildAction(domain, question, analyses);
+  const domain = mapRouteToDomain(effectiveRoutes[0]);
+
+  // If domain is "general" (e.g. routes=["tired"]) but question mentions exercise, override
+  const resolvedDomain: CausalityDomain =
+    domain === "general" && extractSport(question) !== undefined
+      ? "workout"
+      : domain;
+
+  const action = buildAction(resolvedDomain, question, analyses);
 
   if (!action) return null;
 
-  const recommendation = extractRecommendation(domain, analyses);
+  const recommendation = extractRecommendation(resolvedDomain, analyses);
 
   return {
     id: generateId(),
     userId,
-    domain,
+    domain: resolvedDomain,
     timestamp: new Date(),
     biometricsBefore: toBiometricSnapshot(biometrics),
     action,
@@ -235,9 +283,11 @@ function buildAction(
 
     case "workout": {
       const sport = extractSport(question);
+      const duration = extractDuration(question);
       return {
         type: "worked_out",
         detail: sport ?? "general",
+        ...(duration !== undefined ? { amount: duration } : {}),
       };
     }
 

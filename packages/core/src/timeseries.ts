@@ -130,6 +130,64 @@ export function calculatePercentChange(
 }
 
 /**
+ * HRV Spike Detection
+ * Find all dates where HRV exceeded a threshold (e.g., exceptionally high HRV events)
+ * Used to discover personal patterns: "exercise → HRV spike 8h later"
+ */
+export interface HRVSpike {
+  date: string;
+  value: number;
+  previousValue: number;
+  deltaPercent: number;
+  durationHours?: number; // How long it stayed elevated (requires multi-day data)
+}
+
+export function detectHRVSpikes(
+  hrvHistory: number[],
+  dates: string[],
+  threshold: number = 200
+): HRVSpike[] {
+  if (hrvHistory.length !== dates.length) {
+    throw new Error(
+      `hrvHistory length (${hrvHistory.length}) must match dates length (${dates.length})`
+    );
+  }
+
+  const spikes: HRVSpike[] = [];
+
+  for (let i = 0; i < hrvHistory.length; i++) {
+    const current = hrvHistory[i];
+    if (current <= threshold) continue;
+
+    const previous = i > 0 ? hrvHistory[i - 1] : current;
+    const deltaPercent = previous > 0
+      ? ((current - previous) / previous) * 100
+      : 0;
+
+    // Calculate how long HRV stayed above threshold (look forward)
+    let durationHours: number | undefined = undefined;
+    if (i < hrvHistory.length - 1) {
+      let j = i + 1;
+      while (j < hrvHistory.length && hrvHistory[j] > threshold) {
+        j++;
+      }
+      // Each entry is 1 day (24h); sub-day granularity requires hourly data
+      durationHours = (j - i) * 24;
+    }
+
+    spikes.push({
+      date: dates[i],
+      value: current,
+      previousValue: previous,
+      deltaPercent,
+      durationHours,
+    });
+  }
+
+  return spikes;
+}
+
+/**
  * Find local peaks and valleys in time series
  * Useful for identifying where compound effects peak/plateau
  */

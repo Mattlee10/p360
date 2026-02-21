@@ -159,7 +159,7 @@ export { createSupabaseProfileStore } from "./supabase-profile-store";
 // Time-Series Analysis
 // ============================================
 
-export type { TimesSeriesPeakValley } from "./timeseries";
+export type { TimesSeriesPeakValley, HRVSpike } from "./timeseries";
 
 export {
   calculateRollingAverage,
@@ -168,6 +168,7 @@ export {
   detectTrend,
   calculatePercentChange,
   findPeaksAndValleys,
+  detectHRVSpikes,
 } from "./timeseries";
 
 // ============================================

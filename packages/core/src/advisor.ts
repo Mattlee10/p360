@@ -1,7 +1,7 @@
 import { BiometricData } from "./types";
 import { calculateDecisionReadiness } from "./algorithm";
 import { getRecoveryCost, parseSubstance } from "./cost";
-import { calculateRollingAverage, calculateBaselineVariance, detectTrend, detectSignificance } from "./timeseries";
+import { calculateRollingAverage, calculateBaselineVariance, detectTrend, detectSignificance, detectHRVSpikes } from "./timeseries";
 import type { CausalityProfile } from "./causality";
 
 // ============================================
@@ -201,6 +201,20 @@ function minimalAnalysis(
         const hrvSignificant = detectSignificance(recentHrvDelta, hrvBaseline.stdev);
         const readinessSignificant = detectSignificance(recentReadinessDelta, readinessBaseline.stdev);
 
+        // Generate date strings for the history (most recent = today)
+        const today = new Date();
+        const historyDates = Array.from({ length: historyLength }, (_, i) => {
+          const d = new Date(today);
+          d.setDate(d.getDate() - (historyLength - 1 - i));
+          return d.toISOString().split("T")[0];
+        });
+
+        // HRV spike detection: find all days where HRV exceeded threshold
+        // For lovelyloverwho: threshold = 200 (her exceptional range)
+        const currentHrv = data.hrvBalance ?? 0;
+        const spikeThreshold = currentHrv > 150 ? currentHrv * 0.9 : 150;
+        const hrvSpikes = detectHRVSpikes(hrvHistory, historyDates, spikeThreshold);
+
         analyses.rolling = {
           hrv: {
             history: hrvHistory,
@@ -217,6 +231,11 @@ function minimalAnalysis(
             baseline: readinessBaseline,
             recentDelta: recentReadinessDelta,
             isSignificant: readinessSignificant,
+          },
+          spikes: {
+            hrv: hrvSpikes,
+            threshold: spikeThreshold,
+            count: hrvSpikes.length,
           },
         };
         break;
@@ -354,6 +373,23 @@ If "rolling" is in the analysis:
 - Use baseline variance to explain noise floor
 - Example: "HRV trending down for 3 days (54→50→48ms). Below your ±7ms noise floor. Not yet concerning."
 - Compare recent delta to user's historical pattern, not population averages
+
+HRV PATTERN ANALYSIS (if rolling.spikes is present AND user's HRV is exceptionally high):
+When the user mentions a high HRV reading (e.g., "my HRV is 212") OR their current HRV is >150:
+1. Check rolling.spikes.hrv — these are previous similar spikes from their history
+2. If 2+ spikes exist, describe the pattern:
+   - "You've had [N] similar HRV spikes in the past 60 days"
+   - "Pattern: appears after exercise (typically 6-12 hours later)"
+   - "Duration: elevated for ~[X] hours based on your data"
+3. Ask for the exercise timing to refine their personal curve:
+   - "When did you last exercise? Knowing this helps me identify YOUR specific exercise→HRV timing"
+4. If they share exercise timing, estimate:
+   - "Based on your spike history, your HRV likely peaks [8±1h] after exercise"
+   - "Confidence: [X]% (from [N] data points)"
+5. Format response conversationally — this is DISCOVERY, not diagnosis
+   - Bad: "Your HRV is 212" (so what?)
+   - Good: "HRV 212 is exceptional (99th percentile). Your data shows this pattern..."
+NOTE: The spikes data uses simulated history in demo mode. In live mode, real Oura 60-day data feeds this.
 
 Respond in this JSON format:
 {
