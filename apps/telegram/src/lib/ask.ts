@@ -63,16 +63,6 @@ export async function getAskResponse(
     .map((block) => block.text)
     .join("");
 
-  // 4. Process response
-  const result = processAskResponse(responseText, prepared);
-
-  // 3.5. Collect causality event (fire-and-forget)
-  collectEvent(prepared, result).catch(() => {});
-
-  if (!result.nudge) {
-    return result.raw;
-  }
-
   // Helper to escape HTML special characters
   const escapeHtml = (text: string): string => {
     return text
@@ -82,6 +72,16 @@ export async function getAskResponse(
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
   };
+
+  // 4. Process response
+  const result = processAskResponse(responseText, prepared);
+
+  // 3.5. Collect causality event (fire-and-forget)
+  collectEvent(prepared, result).catch(() => {});
+
+  if (!result.nudge) {
+    return escapeHtml(result.raw);
+  }
 
   // 4. Format for Telegram (HTML)
   const lines: string[] = [];
