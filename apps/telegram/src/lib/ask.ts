@@ -73,29 +73,39 @@ export async function getAskResponse(
     return result.raw;
   }
 
+  // Helper to escape HTML special characters
+  const escapeHtml = (text: string): string => {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  };
+
   // 4. Format for Telegram (HTML)
   const lines: string[] = [];
 
-  lines.push(`💬 ${result.nudge.answer}`);
+  lines.push(`💬 ${escapeHtml(result.nudge.answer)}`);
   lines.push("");
 
   if (result.nudge.options.length > 0) {
     lines.push("<b>📊 Options:</b>");
     for (const opt of result.nudge.options) {
       const emoji = getNudgeVerdictEmoji(opt.verdict);
-      lines.push(`  ${emoji} ${opt.label}: ${opt.impact}`);
+      lines.push(`  ${emoji} ${escapeHtml(opt.label)}: ${escapeHtml(opt.impact)}`);
     }
     lines.push("");
   }
 
   if (result.nudge.strategy) {
     lines.push("<b>📋 Strategy:</b>");
-    lines.push(result.nudge.strategy);
+    lines.push(escapeHtml(result.nudge.strategy));
     lines.push("");
   }
 
   if (result.nudge.dataSource) {
-    lines.push(`📈 ${result.nudge.dataSource}`);
+    lines.push(`📈 ${escapeHtml(result.nudge.dataSource)}`);
   }
 
   return lines.join("\n");
