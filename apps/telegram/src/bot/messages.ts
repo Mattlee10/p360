@@ -35,7 +35,7 @@ I help you make smarter decisions based on your biometric data.
   help: `<b>📖 P360 Commands</b>
 
 <b>💬 Ask Questions (Everything goes through /ask)</b>
-/ask <question> - Ask anything about your health
+/ask &lt;question&gt; - Ask anything about your health
 Examples:
   /ask Should I work out today?
   /ask How much can I drink tonight?
