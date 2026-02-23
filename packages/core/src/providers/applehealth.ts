@@ -51,10 +51,11 @@ const SUPPORTED_TYPES = new Set([
 export class AppleHealthXMLParser {
   /**
    * Parse Apple Health XML with optional date filtering.
-   * By default, keeps only the last 6 months to reduce memory footprint.
+   * By default, keeps only the last 3 months to fit within Telegram's 20MB limit.
    * Pass monthsToKeep=null to keep all data.
+   * Typical: 3 months ≈ 15-18MB → fits 20MB Telegram limit
    */
-  parse(xmlText: string, monthsToKeep: number | null = 6): AppleHealthParseResult {
+  parse(xmlText: string, monthsToKeep: number | null = 3): AppleHealthParseResult {
     const dayMap = new Map<string, DayAccumulator>();
     let totalRawRecords = 0;
     let parseErrors = 0;
