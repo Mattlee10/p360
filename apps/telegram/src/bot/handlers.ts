@@ -286,9 +286,9 @@ export async function handleUpload(ctx: Context) {
     }
     const xmlText = await response.text();
 
-    // Parse Apple Health XML
+    // Parse Apple Health XML (keep only last 6 months to reduce size)
     const parser = new AppleHealthXMLParser();
-    const parseResult = parser.parse(xmlText);
+    const parseResult = parser.parse(xmlText, 6);
 
     if (parseResult.records.length === 0) {
       await reply(

@@ -49,10 +49,23 @@ const SUPPORTED_TYPES = new Set([
 ]);
 
 export class AppleHealthXMLParser {
-  parse(xmlText: string): AppleHealthParseResult {
+  /**
+   * Parse Apple Health XML with optional date filtering.
+   * By default, keeps only the last 6 months to reduce memory footprint.
+   * Pass monthsToKeep=null to keep all data.
+   */
+  parse(xmlText: string, monthsToKeep: number | null = 6): AppleHealthParseResult {
     const dayMap = new Map<string, DayAccumulator>();
     let totalRawRecords = 0;
     let parseErrors = 0;
+
+    // Calculate cutoff date (keep data from this date onward)
+    const today = new Date();
+    let cutoffDate: Date | null = null;
+    if (monthsToKeep !== null) {
+      cutoffDate = new Date(today);
+      cutoffDate.setMonth(cutoffDate.getMonth() - monthsToKeep);
+    }
 
     // Regex to match <Record ...> elements with the fields we need.
     // Handles attribute order variation (type before/after value, etc.)
@@ -89,6 +102,14 @@ export class AppleHealthXMLParser {
       if (!date) {
         parseErrors++;
         continue;
+      }
+
+      // Date filtering: skip if before cutoff date (to reduce file size)
+      if (cutoffDate !== null) {
+        const recordDate = new Date(date);
+        if (recordDate < cutoffDate) {
+          continue; // Skip old records
+        }
       }
 
       const acc = dayMap.get(date) ?? {

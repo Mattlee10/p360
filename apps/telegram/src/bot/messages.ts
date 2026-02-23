@@ -74,7 +74,7 @@ P360 will auto-detect activity gaps and adjust your readiness score
 1. Open Health app → tap your profile
 2. "Export All Health Data"
 3. Unzip → attach <code>export.xml</code> here
-(P360 will automatically detect activity and adjust recommendations)
+(P360 automatically processes the last 6 months for faster analysis)
 
 💡 <i>Pro tip: Start with /demo to see how it works!</i>`,
 
