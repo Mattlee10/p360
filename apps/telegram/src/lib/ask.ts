@@ -1,11 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { BiometricData, EventStore, CausalityProfile } from "@p360/core";
+import type { BiometricData, EventStore, CausalityProfile, ActivityConfoundingReport } from "@p360/core";
 import {
   prepareAsk,
   processAskResponse,
   collectEvent,
   getNudgeVerdictEmoji,
   createSupabaseProfileStore,
+  ActivityConfoundingAnalyzer,
 } from "@p360/core";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -19,6 +20,7 @@ export async function getAskResponse(
   data: BiometricData,
   userId?: string,
   eventStore?: EventStore,
+  activityConfounding?: ActivityConfoundingReport,
 ): Promise<string> {
   if (!ANTHROPIC_API_KEY) {
     return "⚠️ <b>Ask feature not configured</b>\n\nServer admin needs to set ANTHROPIC_API_KEY.";
@@ -40,13 +42,14 @@ export async function getAskResponse(
     }
   }
 
-  // 2. Prepare context (now includes profile if available)
+  // 2. Prepare context (now includes profile + activity confounding if available)
   const prepared = prepareAsk({
     question,
     biometricData: data,
     userId,
     eventStore,
     profile,
+    activityConfounding,
   });
 
   // 3. Call Claude API

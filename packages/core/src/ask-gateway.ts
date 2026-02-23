@@ -3,6 +3,7 @@ import { buildAdvisorContext, matchRoutes } from "./advisor";
 import type { NudgeResponse, AdvisorContext } from "./advisor";
 import type { CausalityProfile, EventStore } from "./causality";
 import { extractEventFromAsk } from "./causality-collector";
+import type { ActivityConfoundingReport } from "./activity-confounding";
 
 // ============================================
 // Ask Gateway Types
@@ -18,6 +19,8 @@ export interface AskRequest {
   userId?: string;
   /** Phase 2: EventStore for persisting causality events */
   eventStore?: EventStore;
+  /** Activity confounding from Apple Health cross-reference (optional) */
+  activityConfounding?: ActivityConfoundingReport;
 }
 
 export interface AskPrepared {
@@ -84,7 +87,7 @@ export function prepareAsk(request: AskRequest): AskPrepared {
     || "How am I doing today? What should I focus on?";
 
   const routes = matchRoutes(question);
-  const context = buildAdvisorContext(question, request.biometricData, request.profile);
+  const context = buildAdvisorContext(question, request.biometricData, request.profile, request.activityConfounding);
 
   return {
     question,
