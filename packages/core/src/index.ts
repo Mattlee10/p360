@@ -184,16 +184,6 @@ export {
 } from "./confound-filter";
 
 // ============================================
-// Apple Health Integration
-// ============================================
-
-export type { AppleHealthRecord, AppleHealthParseResult } from "./providers/applehealth";
-export { AppleHealthXMLParser } from "./providers/applehealth";
-
-export type { ActivityConfoundingReport } from "./activity-confounding";
-export { ActivityConfoundingAnalyzer } from "./activity-confounding";
-
-// ============================================
 // Demo Data
 // ============================================
 

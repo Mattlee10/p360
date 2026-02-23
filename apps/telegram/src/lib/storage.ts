@@ -1,7 +1,7 @@
 // Simple in-memory storage for MVP
 // TODO: Replace with Supabase for production
 
-import type { ProviderType, MoodEntry, AppleHealthRecord } from "@p360/core";
+import type { ProviderType, MoodEntry } from "@p360/core";
 import { DrinkLog } from "./drink";
 
 interface UserData {
@@ -19,9 +19,6 @@ interface UserData {
   // Mood tracking (P17)
   moodEntries?: MoodEntry[];
   recoveryHistory?: number[]; // Last N readiness scores
-  // Apple Health integration
-  appleHealthRecords?: AppleHealthRecord[];
-  lastAppleHealthUploadAt?: Date;
 }
 
 const users = new Map<number, UserData>();
@@ -188,25 +185,6 @@ export function addRecoveryScore(telegramId: number, readiness: number): void {
 
 export function getRecoveryHistory(telegramId: number): number[] {
   return users.get(telegramId)?.recoveryHistory || [];
-}
-
-// ============================================
-// Apple Health Integration
-// ============================================
-
-export function setAppleHealthRecords(telegramId: number, records: AppleHealthRecord[]): void {
-  setUser(telegramId, {
-    appleHealthRecords: records,
-    lastAppleHealthUploadAt: new Date(),
-  });
-}
-
-export function getAppleHealthRecords(telegramId: number): AppleHealthRecord[] {
-  return users.get(telegramId)?.appleHealthRecords ?? [];
-}
-
-export function getLastAppleHealthUploadAt(telegramId: number): Date | undefined {
-  return users.get(telegramId)?.lastAppleHealthUploadAt;
 }
 
 // Stats functions

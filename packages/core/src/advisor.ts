@@ -3,8 +3,6 @@ import { calculateDecisionReadiness } from "./algorithm";
 import { getRecoveryCost, parseSubstance } from "./cost";
 import { calculateRollingAverage, calculateBaselineVariance, detectTrend, detectSignificance, detectHRVSpikes } from "./timeseries";
 import type { CausalityProfile } from "./causality";
-import type { ActivityConfoundingReport } from "./activity-confounding";
-import { ActivityConfoundingAnalyzer } from "./activity-confounding";
 
 // ============================================
 // Advisor Types
@@ -300,7 +298,6 @@ export function buildSystemPrompt(
   data: BiometricData,
   analyses: Record<string, unknown>,
   profile?: CausalityProfile,
-  activityConfounding?: ActivityConfoundingReport,
 ): string {
   const biometrics = formatBiometrics(data);
   const analysisJson = JSON.stringify(analyses, null, 2);
@@ -316,17 +313,6 @@ PERSONAL PATTERNS (learned from ${profile.totalEvents} historical events):
 ${patternLines}
 IMPORTANT: These are THIS user's actual measured sensitivities, not population averages.
 The pre-computed analysis already uses these personal values. Reference them in your response.`;
-  }
-
-  // Activity confounding section (injected when Apple Health data is available)
-  let confoundingSection = "";
-  if (activityConfounding) {
-    const analyzer = new ActivityConfoundingAnalyzer();
-    const report = analyzer.generateReport(activityConfounding);
-    confoundingSection = `\n\nACTIVITY CONFOUNDING DATA:\n${report}`;
-    if (activityConfounding.detectedConfound) {
-      confoundingSection += `\n\nACTIVITY GUIDANCE: Oura's readiness score is inflated because it missed activity tracked by Apple Watch. Use adjustedReadiness (${activityConfounding.adjustedReadiness}) instead of Oura's score (${activityConfounding.ourasReadiness}) for training recommendations. Always tell the user: "Oura says ${activityConfounding.ourasReadiness}, but P360 adjusted for your ${activityConfounding.appleHealthSteps.toLocaleString()} Apple Health steps: ${activityConfounding.adjustedReadiness}"`;
-    }
   }
 
   return `You are P360, a biometric-data-driven personal advisor.
@@ -386,7 +372,7 @@ BODY STATE:
 ${biometrics}
 
 PRE-COMPUTED ANALYSIS:
-${analysisJson}${personalSection}${confoundingSection}
+${analysisJson}${personalSection}
 
 ROLLING AVERAGE INTERPRETATION (if present in analysis):
 If "rolling" is in the analysis:
@@ -432,11 +418,10 @@ export function buildAdvisorContext(
   question: string,
   data: BiometricData,
   profile?: CausalityProfile,
-  activityConfounding?: ActivityConfoundingReport,
 ): AdvisorContext {
   const routes = matchRoutes(question);
   const analyses = minimalAnalysis(routes, data, question, profile);
-  const systemPrompt = buildSystemPrompt(data, analyses, profile, activityConfounding);
+  const systemPrompt = buildSystemPrompt(data, analyses, profile);
 
   return {
     question,

@@ -50,11 +50,6 @@ Examples:
 /status - Check connection status
 /disconnect - Remove device connection
 
-<b>📱 Apple Health Integration</b>
-Simply attach your <code>export.xml</code> file from Apple Health
-P360 will auto-detect activity gaps and adjust your readiness score
-(No command needed - just upload the file directly)
-
 <b>ℹ️ Help</b>
 /help - Show this message
 
@@ -69,12 +64,6 @@ P360 will auto-detect activity gaps and adjust your readiness score
 1. Go to developer.whoop.com
 2. Get your access token
 3. Send: /connect whoop YOUR_TOKEN
-
-<b>How to upload Apple Health data:</b>
-1. Open Health app → tap your profile
-2. "Export All Health Data"
-3. Unzip → attach <code>export.xml</code> here
-(P360 automatically processes the last 3 months for Telegram's 20MB limit)
 
 💡 <i>Pro tip: Start with /demo to see how it works!</i>`,
 

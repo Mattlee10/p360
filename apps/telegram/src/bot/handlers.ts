@@ -1,6 +1,5 @@
 import { Context } from "grammy";
 import type { ProviderType } from "@p360/core";
-import { AppleHealthXMLParser, ActivityConfoundingAnalyzer } from "@p360/core";
 import { MESSAGES } from "./messages";
 import {
   getUser,
@@ -11,8 +10,6 @@ import {
   getProvider,
   getProviderToken,
   hasConnectedDevice,
-  setAppleHealthRecords,
-  getAppleHealthRecords,
 } from "../lib/storage";
 import {
   fetchBiometricData,
@@ -81,27 +78,7 @@ async function routeThroughAsk(
 
     const userId = `tg-${telegramId}`;
 
-    // Load Apple Health confounding if available
-    let activityConfounding;
-    if (!demo && data.readinessScore !== null) {
-      const appleRecords = getAppleHealthRecords(telegramId);
-      if (appleRecords.length > 0) {
-        const today = new Date().toISOString().split("T")[0];
-        // Use today's record or the most recent one
-        const record = appleRecords.find((r) => r.date === today)
-          ?? appleRecords[appleRecords.length - 1];
-        if (record) {
-          const confoundAnalyzer = new ActivityConfoundingAnalyzer();
-          activityConfounding = confoundAnalyzer.analyze(
-            data.readinessScore,
-            null, // activityBalance not in BiometricData (Phase 2 precision)
-            record.steps,
-          );
-        }
-      }
-    }
-
-    const message = await getAskResponse(question, data, userId, eventStore, activityConfounding);
+    const message = await getAskResponse(question, data, userId, eventStore);
     updateLastCheck(telegramId);
 
     const demoNote = demo
@@ -244,114 +221,3 @@ export async function handleUnknown(ctx: Context) {
   );
 }
 
-// /upload (or document attachment) — Apple Health export.xml ingestion
-export async function handleUpload(ctx: Context) {
-  const telegramId = ctx.from?.id;
-  if (!telegramId) return;
-
-  const document = ctx.message?.document;
-  if (!document) {
-    await reply(
-      ctx,
-      `📤 <b>Upload Apple Health Data</b>\n\nAttach your <code>export.xml</code> file from Apple Health.\n\n<b>How to export:</b>\n1. Open Health app → tap your profile pic\n2. "Export All Health Data"\n3. Unzip → send <code>export.xml</code> here\n\n<i>File size limit: 20MB (trim to recent months if larger)</i>`
-    );
-    return;
-  }
-
-  // File size check (Telegram getFile limit is 20MB)
-  const MAX_SIZE = 20 * 1024 * 1024;
-  if (document.file_size && document.file_size > MAX_SIZE) {
-    await reply(
-      ctx,
-      `⚠️ File too large (${Math.round(document.file_size / 1024 / 1024)}MB). Max 20MB.\n\nTip: Open export.xml and keep only the last 6 months of data.`
-    );
-    return;
-  }
-
-  await ctx.reply("⏳ Parsing Apple Health data...");
-
-  try {
-    // Download file from Telegram
-    const file = await ctx.api.getFile(document.file_id);
-    if (!file.file_path) {
-      await reply(ctx, "❌ Could not download file. Try again.");
-      return;
-    }
-
-    const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
-    const response = await fetch(fileUrl);
-    if (!response.ok) {
-      await reply(ctx, "❌ Failed to download file. Try again.");
-      return;
-    }
-    const xmlText = await response.text();
-
-    // Parse Apple Health XML (keep only last 3 months to fit 20MB limit)
-    const parser = new AppleHealthXMLParser();
-    const parseResult = parser.parse(xmlText, 3);
-
-    if (parseResult.records.length === 0) {
-      await reply(
-        ctx,
-        `⚠️ No step data found.\n\nMake sure you uploaded <code>export.xml</code> (not the zip file). The file should contain <code>HKQuantityTypeIdentifierStepCount</code> records.`
-      );
-      return;
-    }
-
-    // Store records in memory
-    setAppleHealthRecords(telegramId, parseResult.records);
-
-    // Run confounding analysis if device is connected
-    let confoundingMessage = "";
-    if (hasConnectedDevice(telegramId)) {
-      try {
-        const biometricData = await getUserBiometricData(telegramId);
-        if (biometricData && biometricData.readinessScore !== null) {
-          // Find most recent Apple Health record
-          const latestRecord = parseResult.records[parseResult.records.length - 1];
-          if (latestRecord) {
-            const analyzer = new ActivityConfoundingAnalyzer();
-            const report = analyzer.analyze(
-              biometricData.readinessScore,
-              null, // activityBalance not exposed from BiometricData (Phase 2)
-              latestRecord.steps,
-            );
-            if (report.detectedConfound) {
-              confoundingMessage = `\n\n🔍 <b>Activity Confounding Detected!</b>\n` +
-                `Apple Health: ${latestRecord.steps.toLocaleString()} steps (${latestRecord.date})\n` +
-                `Oura estimated: ~${report.ouraEstimatedSteps.toLocaleString()} steps\n` +
-                `Step gap: ${report.stepGap.toLocaleString()} steps\n\n` +
-                `📊 Readiness adjustment:\n` +
-                `Oura: ${report.ourasReadiness} → P360 adjusted: <b>${report.adjustedReadiness}</b> (${report.readinessDelta} pts)\n` +
-                `Oura says: "${report.ourasRecommendation}"\n` +
-                `P360 says: "<b>${report.p360Recommendation}</b>"\n\n` +
-                `<i>Confidence: ${report.confidence}% | Now /ask for adjusted recommendations</i>`;
-            } else {
-              confoundingMessage = `\n\n✅ No significant activity gap detected between Oura and Apple Health.`;
-            }
-          }
-        }
-      } catch {
-        // Confounding analysis is best-effort, don't fail upload
-      }
-    }
-
-    const errorNote = parseResult.parseErrors > 0
-      ? `\n<i>⚠️ ${parseResult.parseErrors} records skipped (parse errors)</i>`
-      : "";
-
-    await reply(
-      ctx,
-      `✅ <b>Apple Health data uploaded!</b>\n\n` +
-      `📅 ${parseResult.records.length} days of data\n` +
-      `📆 ${parseResult.dateRange.start} → ${parseResult.dateRange.end}\n` +
-      `📊 ${parseResult.totalRawRecords.toLocaleString()} raw records processed` +
-      errorNote +
-      confoundingMessage +
-      `\n\n💬 Now use /ask for activity-aware recommendations!`
-    );
-  } catch (error) {
-    console.error("Upload error:", error);
-    await reply(ctx, "❌ Error parsing Apple Health data. Make sure you sent export.xml.");
-  }
-}

@@ -17,7 +17,6 @@ import {
   handleAsk,
   handleDemo,
   handleUnknown,
-  handleUpload,
 } from "./bot/handlers";
 
 // Load environment variables
@@ -54,9 +53,6 @@ bot.command("demo", handleDemo);
 bot.command("connect", handleConnect);
 bot.command("status", handleStatus);
 bot.command("disconnect", handleDisconnect);
-
-// Apple Health XML upload (document attachment)
-bot.on("message:document", handleUpload);
 
 // Handle unknown commands
 bot.on("message:text", (ctx) => {
