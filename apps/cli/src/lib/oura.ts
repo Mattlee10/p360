@@ -1,5 +1,5 @@
 import { getOuraTokens, setOuraTokens } from "./config";
-import type { BiometricData, OuraDailySleep, OuraDailyReadiness } from "@p360/core";
+import type { BiometricData, BiometricHistory, OuraDailySleep, OuraDailyReadiness } from "@p360/core";
 import { getRandomDemoData as coreGetRandomDemoData } from "@p360/core";
 
 const OURA_API_BASE = "https://api.ouraring.com/v2";
@@ -89,16 +89,17 @@ export async function fetchBiometricData(): Promise<BiometricData> {
 
   try {
     const today = new Date().toISOString().split("T")[0];
-    const yesterday = new Date(Date.now() - 86400000)
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000)
       .toISOString()
       .split("T")[0];
 
     const [sleepData, readinessData] = await Promise.all([
-      fetchSleepData(tokens.accessToken, yesterday, today),
-      fetchReadinessData(tokens.accessToken, yesterday, today),
+      fetchSleepData(tokens.accessToken, sixtyDaysAgo, today),
+      fetchReadinessData(tokens.accessToken, sixtyDaysAgo, today),
     ]);
 
-    return parseBiometricData(sleepData, readinessData);
+    const history = buildHistory(sleepData, readinessData);
+    return parseBiometricData(sleepData, readinessData, history);
   } catch (error) {
     if (error instanceof Error) {
       if (error.message.includes("401")) {
@@ -165,7 +166,8 @@ async function fetchReadinessData(
 
 function parseBiometricData(
   sleepData: OuraDailySleep[],
-  readinessData: OuraDailyReadiness[]
+  readinessData: OuraDailyReadiness[],
+  history?: BiometricHistory
 ): BiometricData {
   // Get most recent data
   const latestSleep = sleepData[sleepData.length - 1];
@@ -177,7 +179,29 @@ function parseBiometricData(
     hrvBalance: latestReadiness?.contributors?.hrv_balance ?? null,
     restingHR: latestReadiness?.contributors?.resting_heart_rate ?? null,
     date: latestReadiness?.day ?? latestSleep?.day ?? new Date().toISOString().split("T")[0],
+    history,
   };
+}
+
+function buildHistory(
+  sleepData: OuraDailySleep[],
+  readinessData: OuraDailyReadiness[]
+): BiometricHistory | undefined {
+  if (sleepData.length < 7 || readinessData.length < 7) return undefined;
+
+  const readinessByDate = new Map(readinessData.map((r) => [r.day, r]));
+  const sleepByDate = new Map(sleepData.map((s) => [s.day, s]));
+
+  const dates = readinessData.map((r) => r.day);
+  const hrvValues = dates.map(
+    (d) => readinessByDate.get(d)?.contributors?.hrv_balance ?? 0
+  );
+  const readinessValues = dates.map(
+    (d) => readinessByDate.get(d)?.score ?? 0
+  );
+  const sleepValues = dates.map((d) => sleepByDate.get(d)?.score ?? 0);
+
+  return { hrvValues, readinessValues, sleepValues, dates };
 }
 
 export function getDemoData(): BiometricData {

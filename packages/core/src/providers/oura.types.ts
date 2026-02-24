@@ -42,3 +42,20 @@ export interface OuraSleepData {
 export interface OuraReadinessData {
   data: OuraDailyReadiness[];
 }
+
+export interface OuraDailyActivity {
+  id: string;
+  day: string;
+  score: number | null;
+  active_calories: number | null;
+  average_met_minutes: number | null;
+  steps: number | null;
+  long_periods_sedentary: number | null;
+  high_activity_met_minutes: number | null;
+  medium_activity_met_minutes: number | null;
+  low_activity_met_minutes: number | null;
+}
+
+export interface OuraActivityData {
+  data: OuraDailyActivity[];
+}

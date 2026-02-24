@@ -11,6 +11,15 @@ export interface BiometricData {
   // Optional: baseline comparison
   hrvBaseline?: number | null;
   sleepBaseline?: number | null;
+  // Optional: 60-day historical arrays for signal/noise analysis
+  history?: BiometricHistory;
+}
+
+export interface BiometricHistory {
+  hrvValues: number[];       // 60-day HRV balance values (oldest → newest)
+  readinessValues: number[]; // 60-day readiness scores
+  sleepValues: number[];     // 60-day sleep scores
+  dates: string[];           // Corresponding dates
 }
 
 // ============================================
@@ -102,4 +111,6 @@ export type {
   OuraDailyReadiness,
   OuraSleepData,
   OuraReadinessData,
+  OuraDailyActivity,
+  OuraActivityData,
 } from "./providers/oura.types";

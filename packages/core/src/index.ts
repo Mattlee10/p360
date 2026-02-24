@@ -4,6 +4,7 @@
 
 export type {
   BiometricData,
+  BiometricHistory,
   DecisionContext,
   DecisionCategory,
   DecisionImportance,
@@ -16,6 +17,7 @@ export type {
   OuraDailyReadiness,
   OuraSleepData,
   OuraReadinessData,
+  OuraDailyActivity,
 } from "./types";
 
 // ============================================
@@ -182,6 +184,23 @@ export {
   applyConfoundFiltering,
   estimateConfoundPenalty,
 } from "./confound-filter";
+
+// ============================================
+// Activity Analyzer (Oura Activity → Confound Detection)
+// ============================================
+
+export type {
+  ActivityBaseline,
+  ActivityConfoundSummary,
+  ConfoundingAnalysis,
+} from "./activity-analyzer";
+
+export {
+  estimateActivityBaseline,
+  generateConfoundFlagsFromActivity,
+  buildActivityConfoundTimeline,
+  analyzeActivityConfounding,
+} from "./activity-analyzer";
 
 // ============================================
 // Demo Data

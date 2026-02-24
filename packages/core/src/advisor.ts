@@ -1,7 +1,8 @@
-import { BiometricData } from "./types";
+import { BiometricData, BiometricHistory, OuraDailyActivity } from "./types";
 import { calculateDecisionReadiness } from "./algorithm";
 import { getRecoveryCost, parseSubstance } from "./cost";
 import { calculateRollingAverage, calculateBaselineVariance, detectTrend, detectSignificance, detectHRVSpikes } from "./timeseries";
+import { analyzeActivityConfounding } from "./activity-analyzer";
 import type { CausalityProfile } from "./causality";
 
 // ============================================
@@ -95,6 +96,15 @@ const ROUTES: RouteMatch[] = [
       "걸음", "애플 헬스", "활동",
     ],
   },
+  {
+    key: "confound",
+    keywords: [
+      "why is", "why am", "confused", "algorithm", "different", "gap",
+      "doesn't match", "don't match", "high stress", "stress but", "explain",
+      "makes no sense", "weird", "strange", "unusual", "odd",
+      "왜", "이상", "이유", "알고리즘", "갭", "맞지 않",
+    ],
+  },
 ];
 
 export function matchRoutes(question: string): string[] {
@@ -118,11 +128,28 @@ export function matchRoutes(question: string): string[] {
 // Minimal Analysis (Claude handles the rest)
 // ============================================
 
+function generateFallbackHistory(
+  baseValue: number | null,
+  length: number,
+  amplitude: number = 10,
+  noise: number = 15
+): number[] {
+  const base = baseValue ?? 50;
+  const history: number[] = [];
+  for (let i = 0; i < length; i++) {
+    const trend = base + Math.sin(i / 7) * amplitude;
+    const noiseVal = (Math.random() - 0.5) * noise;
+    history.push(Math.max(25, Math.min(100, trend + noiseVal)));
+  }
+  return history;
+}
+
 function minimalAnalysis(
   routes: string[],
   data: BiometricData,
   question: string,
   profile?: CausalityProfile,
+  activityData?: OuraDailyActivity[],
 ): Record<string, unknown> {
   const analyses: Record<string, unknown> = {};
 
@@ -143,6 +170,75 @@ function minimalAnalysis(
       : hrvDeviation < -10 ? "below_baseline"
       : "at_baseline",
   };
+
+  // Timing context: always compute (helps Claude flag high-risk decision windows)
+  {
+    const now = new Date();
+    const hour = now.getHours();
+    const dayOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][now.getDay()];
+    const isWeekend = [0, 6].includes(now.getDay());
+
+    // Assess decision quality risk based on time + readiness
+    const readiness = data.readinessScore ?? 65;
+    const isNightTime = hour >= 23 || hour <= 5;
+    const isAfternoonSlump = hour >= 13 && hour <= 15;
+    const isLowReadiness = readiness < 40;
+    const isGoodWindow = hour >= 6 && hour <= 12 && readiness >= 70;
+
+    const decisionQualityRisk: "high" | "medium" | "low" =
+      isLowReadiness || isNightTime ? "high"
+      : isAfternoonSlump ? "medium"
+      : "low";
+
+    analyses.timingContext = {
+      hourOfDay: hour,
+      dayOfWeek,
+      isWeekend,
+      decisionQualityRisk,
+      isGoodDecisionWindow: isGoodWindow,
+      riskReason: isNightTime ? "Late night — cognitive function impaired"
+        : isLowReadiness ? `Low readiness (${readiness}) — body not recovered`
+        : isAfternoonSlump ? "Afternoon slump (1-3pm) — typical focus dip"
+        : null,
+    };
+  }
+
+  // Signal quality: always compute if real 60d history is available
+  // Helps Claude distinguish signal vs noise for any question
+  if (data.history && data.history.hrvValues.length >= 14) {
+    const h = data.history;
+    const hrvRolling = calculateRollingAverage(h.hrvValues, 7);
+    const readinessRolling = calculateRollingAverage(h.readinessValues, 7);
+    const hrvBase = calculateBaselineVariance(hrvRolling);
+    const readinessBase = calculateBaselineVariance(readinessRolling);
+
+    const currentHrv = h.hrvValues[h.hrvValues.length - 1] ?? data.hrvBalance ?? 50;
+    const currentReadiness = h.readinessValues[h.readinessValues.length - 1] ?? data.readinessScore ?? 65;
+    const hrvDelta = currentHrv - hrvBase.mean;
+    const readinessDelta = currentReadiness - readinessBase.mean;
+
+    analyses.signalQuality = {
+      dataSource: "real_60d",
+      hrv: {
+        currentValue: currentHrv,
+        baseline: { mean: Math.round(hrvBase.mean * 10) / 10, stdev: Math.round(hrvBase.stdev * 10) / 10 },
+        delta: Math.round(hrvDelta * 10) / 10,
+        isSignificant: detectSignificance(hrvDelta, hrvBase.stdev, 1.5),
+        confidence: detectSignificance(hrvDelta, hrvBase.stdev, 2.0) ? "high"
+          : detectSignificance(hrvDelta, hrvBase.stdev, 0.5) ? "low" : "medium",
+        noiseFloor: `±${Math.round(hrvBase.stdev * 10) / 10}`,
+      },
+      readiness: {
+        currentValue: currentReadiness,
+        baseline: { mean: Math.round(readinessBase.mean * 10) / 10, stdev: Math.round(readinessBase.stdev * 10) / 10 },
+        delta: Math.round(readinessDelta * 10) / 10,
+        isSignificant: detectSignificance(readinessDelta, readinessBase.stdev, 1.5),
+        confidence: detectSignificance(readinessDelta, readinessBase.stdev, 2.0) ? "high"
+          : detectSignificance(readinessDelta, readinessBase.stdev, 0.5) ? "low" : "medium",
+        noiseFloor: `±${Math.round(readinessBase.stdev * 10) / 10}`,
+      },
+    };
+  }
 
   for (const route of routes) {
     switch (route) {
@@ -182,21 +278,28 @@ function minimalAnalysis(
       }
 
       case "rolling": {
-        // Time-series analysis with rolling averages
-        // In production, this would come from Oura API historical fetch
-        const historyLength = 60;
-        const hrvHistory: number[] = [];
-        const readinessHistory: number[] = [];
+        // Use real 60-day history if available, fallback to simulated
+        const historyData: BiometricHistory | undefined = data.history;
+        const usingRealData = !!historyData && historyData.hrvValues.length >= 7;
 
-        for (let i = 0; i < historyLength; i++) {
-          const baseHrv = (data.hrvBalance ?? 50) + Math.sin(i / 7) * 10;
-          const noiseHrv = (Math.random() - 0.5) * 15;
-          hrvHistory.push(Math.max(25, baseHrv + noiseHrv));
+        const hrvHistory = usingRealData
+          ? historyData!.hrvValues
+          : generateFallbackHistory(data.hrvBalance, 60, 10, 15);
 
-          const baseReadiness = (data.readinessScore ?? 65) + Math.sin(i / 7) * 15;
-          const noiseReadiness = (Math.random() - 0.5) * 10;
-          readinessHistory.push(Math.max(0, Math.min(100, baseReadiness + noiseReadiness)));
-        }
+        const readinessHistory = usingRealData
+          ? historyData!.readinessValues
+          : generateFallbackHistory(data.readinessScore, 60, 15, 10);
+
+        const historyDates = usingRealData
+          ? historyData!.dates
+          : (() => {
+              const today = new Date();
+              return Array.from({ length: 60 }, (_, i) => {
+                const d = new Date(today);
+                d.setDate(d.getDate() - (59 - i));
+                return d.toISOString().split("T")[0];
+              });
+            })();
 
         const hrvRolling = calculateRollingAverage(hrvHistory, 7);
         const readinessRolling = calculateRollingAverage(readinessHistory, 7);
@@ -209,36 +312,39 @@ function minimalAnalysis(
         const hrvSignificant = detectSignificance(recentHrvDelta, hrvBaseline.stdev);
         const readinessSignificant = detectSignificance(recentReadinessDelta, readinessBaseline.stdev);
 
-        // Generate date strings for the history (most recent = today)
-        const today = new Date();
-        const historyDates = Array.from({ length: historyLength }, (_, i) => {
-          const d = new Date(today);
-          d.setDate(d.getDate() - (historyLength - 1 - i));
-          return d.toISOString().split("T")[0];
-        });
-
-        // HRV spike detection: find all days where HRV exceeded threshold
-        // For lovelyloverwho: threshold = 200 (her exceptional range)
+        // HRV spike detection
         const currentHrv = data.hrvBalance ?? 0;
         const spikeThreshold = currentHrv > 150 ? currentHrv * 0.9 : 150;
-        const hrvSpikes = detectHRVSpikes(hrvHistory, historyDates, spikeThreshold);
+        const spikeDates = historyDates.slice(-hrvHistory.length);
+        const hrvSpikes = detectHRVSpikes(
+          hrvHistory.slice(-spikeDates.length),
+          spikeDates,
+          spikeThreshold
+        );
 
         analyses.rolling = {
+          dataSource: usingRealData ? "real_60d" : "simulated",
           hrv: {
-            history: hrvHistory,
-            rolling: hrvRolling,
-            trends: hrvTrends,
+            history: hrvHistory.slice(-14), // Send last 14d only (reduce payload)
+            rolling: hrvRolling.slice(-14),
+            trends: hrvTrends.slice(-14),
             baseline: hrvBaseline,
             recentDelta: recentHrvDelta,
             isSignificant: hrvSignificant,
+            noiseFloor: `±${Math.round(hrvBaseline.stdev * 10) / 10}`,
+            confidence: detectSignificance(recentHrvDelta, hrvBaseline.stdev, 2.0) ? "high"
+              : detectSignificance(recentHrvDelta, hrvBaseline.stdev, 0.5) ? "low" : "medium",
           },
           readiness: {
-            history: readinessHistory,
-            rolling: readinessRolling,
-            trends: readinessTrends,
+            history: readinessHistory.slice(-14),
+            rolling: readinessRolling.slice(-14),
+            trends: readinessTrends.slice(-14),
             baseline: readinessBaseline,
             recentDelta: recentReadinessDelta,
             isSignificant: readinessSignificant,
+            noiseFloor: `±${Math.round(readinessBaseline.stdev * 10) / 10}`,
+            confidence: detectSignificance(recentReadinessDelta, readinessBaseline.stdev, 2.0) ? "high"
+              : detectSignificance(recentReadinessDelta, readinessBaseline.stdev, 0.5) ? "low" : "medium",
           },
           spikes: {
             hrv: hrvSpikes,
@@ -246,6 +352,57 @@ function minimalAnalysis(
             count: hrvSpikes.length,
           },
         };
+        break;
+      }
+
+      case "confound": {
+        // Confounding detection: explain why readiness/HRV doesn't match how user feels
+        // Uses Oura activity data to detect high-activity confounding
+        if (
+          activityData &&
+          activityData.length >= 3 &&
+          data.history &&
+          data.history.readinessValues.length >= 3
+        ) {
+          const confoundAnalysis = analyzeActivityConfounding(
+            activityData,
+            data.history.readinessValues,
+            data.history.hrvValues
+          );
+
+          analyses.confoundingDetection = {
+            baseline: {
+              avgSteps: confoundAnalysis.baseline.avgSteps,
+              avgActiveCalories: confoundAnalysis.baseline.avgActiveCalories,
+            },
+            latestDay: confoundAnalysis.latestDay
+              ? {
+                  date: confoundAnalysis.latestDay.date,
+                  steps: confoundAnalysis.latestDay.steps,
+                  activeCalories: confoundAnalysis.latestDay.activeCalories,
+                  trainingIntensity: confoundAnalysis.latestDay.trainingIntensity,
+                  isHighActivityDay: confoundAnalysis.latestDay.isHighActivityDay,
+                }
+              : null,
+            adjustedReadiness: {
+              raw: confoundAnalysis.adjustedReadiness.raw.slice(-3),
+              adjusted: confoundAnalysis.adjustedReadiness.adjusted.slice(-3),
+            },
+            activityExplainsGap: confoundAnalysis.activityExplainsGap,
+            interpretation: confoundAnalysis.interpretation,
+          };
+        } else if (activityData && activityData.length >= 1) {
+          // Partial data: just show latest activity context
+          const latest = activityData[activityData.length - 1];
+          analyses.confoundingDetection = {
+            latestDay: {
+              date: latest.day,
+              steps: latest.steps,
+              activeCalories: latest.active_calories,
+            },
+            note: "Limited history — confounding analysis needs 7+ days of data",
+          };
+        }
         break;
       }
 
@@ -387,11 +544,48 @@ ${biometrics}
 PRE-COMPUTED ANALYSIS:
 ${analysisJson}${personalSection}
 
-ROLLING AVERAGE INTERPRETATION (if present in analysis):
+DECISION TIMING AWARENESS (timingContext is ALWAYS present in analysis):
+ALWAYS check timingContext.decisionQualityRisk before answering:
+- "high" risk: Add warning "⚠️ High-stakes decisions are risky right now ([hourOfDay]:00, [riskReason])"
+  → Suggest: "Wait until morning if possible. If you must decide now, sleep on it first."
+  → Still answer the question, but add this caution FIRST
+- "medium" risk: Add note "⚠️ Afternoon slump window. Double-check important decisions."
+  → Good for routine/low-stakes decisions. Flag high-stakes for morning/evening.
+- "low" risk (isGoodDecisionWindow = true): You can mention "✅ Good decision window right now."
+  → Don't always mention this — only if it's relevant to the question
+
+CONFOUNDING DETECTION (if "confoundingDetection" is in analysis):
+When confoundingDetection is present, explain WHY the user's readiness/HRV doesn't match expectations:
+- Check confoundingDetection.activityExplainsGap:
+  - true: "Your readiness drop is explained by high activity, not real stress"
+    → Show: raw readiness vs activity-adjusted readiness
+    → Example: "Readiness shows 45, but after adjusting for 15,000 steps yesterday → your real level is ~58"
+    → Reassure: "This is confounding, not physiological decline"
+  - false: "Activity levels are normal — this drop reflects real physiological stress"
+    → Take the readiness drop seriously
+- Always show baseline context: "Your average: [avgSteps] steps/day"
+- Use confoundingDetection.interpretation verbatim (it's already formatted)
+
+SIGNAL QUALITY INTERPRETATION (if "signalQuality" is in analysis):
+When signalQuality is present (real 60-day data), ALWAYS use it to distinguish signal from noise:
+- Check signalQuality.hrv.isSignificant + signalQuality.readiness.isSignificant
+- If isSignificant = true + confidence = "high": "⭐ This is a real signal, not noise"
+  → Recommend action (rest, intervention, etc.)
+- If isSignificant = false OR confidence = "low": "○ This is normal variation (within noise floor)"
+  → Recommend monitoring, not panic
+- Always show noise floor: "Your HRV noise floor: ±[noiseFloor]. Current delta: [delta]"
+- Show baseline: "Your 60d average: [baseline.mean] ± [baseline.stdev]"
+- Example outputs:
+  - SIGNAL: "HRV drop of -8 exceeds your ±3.2 noise floor (high confidence). This is real — rest today."
+  - NOISE: "HRV drop of -2 is within your ±5.1 noise floor. Normal variation — not a signal."
+  - LOW CONFIDENCE: "HRV drop of -4 is borderline. Wait 2-3 more days before acting."
+
+ROLLING AVERAGE INTERPRETATION (if "rolling" is in analysis):
 If "rolling" is in the analysis:
 - Show the 7-day trend direction (recent 3-5 days)
 - Highlight if recent values are SIGNAL (⭐) vs normal variation
 - Use baseline variance to explain noise floor
+- Show whether data is real ("real_60d") or simulated — mention it matters
 - Example: "HRV trending down for 3 days (54→50→48ms). Below your ±7ms noise floor. Not yet concerning."
 - Compare recent delta to user's historical pattern, not population averages
 
@@ -432,9 +626,10 @@ export function buildAdvisorContext(
   data: BiometricData,
   profile?: CausalityProfile,
   tone?: "default" | "hardcore",
+  activityData?: OuraDailyActivity[],
 ): AdvisorContext {
   const routes = matchRoutes(question);
-  const analyses = minimalAnalysis(routes, data, question, profile);
+  const analyses = minimalAnalysis(routes, data, question, profile, activityData);
   const systemPrompt = buildSystemPrompt(data, analyses, profile, tone);
 
   return {
