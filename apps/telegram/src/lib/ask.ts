@@ -21,6 +21,7 @@ export async function getAskResponse(
   userId?: string,
   eventStore?: EventStore,
   activityConfounding?: ActivityConfoundingReport,
+  tone?: "default" | "hardcore",
 ): Promise<string> {
   if (!ANTHROPIC_API_KEY) {
     return "⚠️ <b>Ask feature not configured</b>\n\nServer admin needs to set ANTHROPIC_API_KEY.";
@@ -50,6 +51,7 @@ export async function getAskResponse(
     eventStore,
     profile,
     activityConfounding,
+    tone,
   });
 
   // 3. Call Claude API

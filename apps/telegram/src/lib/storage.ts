@@ -91,6 +91,20 @@ export function getUsersWithMorningAlert(): UserData[] {
   return getAllUsers().filter((u) => u.ouraToken && u.morningAlertTime);
 }
 
+export interface ConnectedUser {
+  telegramId: number;
+  providerToken: string;
+}
+
+export function getConnectedUsers(): ConnectedUser[] {
+  return getAllUsers()
+    .filter((u) => u.providerToken || u.ouraToken)
+    .map((u) => ({
+      telegramId: u.telegramId,
+      providerToken: (u.providerToken || u.ouraToken) as string,
+    }));
+}
+
 // Drink log functions
 export function addDrinkLog(telegramId: number, amount: number): DrinkLog {
   const user = users.get(telegramId);

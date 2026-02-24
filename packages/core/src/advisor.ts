@@ -298,6 +298,7 @@ export function buildSystemPrompt(
   data: BiometricData,
   analyses: Record<string, unknown>,
   profile?: CausalityProfile,
+  tone?: "default" | "hardcore",
 ): string {
   const biometrics = formatBiometrics(data);
   const analysisJson = JSON.stringify(analyses, null, 2);
@@ -315,11 +316,17 @@ IMPORTANT: These are THIS user's actual measured sensitivities, not population a
 The pre-computed analysis already uses these personal values. Reference them in your response.`;
   }
 
-  return `You are P360, a biometric-data-driven personal advisor.
-You have the user's real-time body data and pre-computed analysis below.
-YOU are the decision engine — use biometrics + context to give personalized advice.
-
-RULES:
+  const rules = tone === "hardcore"
+    ? `HARDCORE MODE — NO FLUFF:
+1. Numbers only. No encouragement. No emojis (except verdict: 🟢🟡🔴).
+2. Format: "[Metric] → Cost: [Impact] → Worth it?"
+3. State the exact opportunity cost. No softening.
+4. NEVER say: "Great job", "Listen to your body", "Be kind to yourself", "You're doing great"
+5. Use the pre-computed analysis data for accurate numbers. Do NOT invent numbers.
+6. Show 2-3 OPTIONS with exact point costs.
+7. End with: "Your call." — nothing else.
+8. Example output: "HRV -18%. Training today = -12pts readiness tomorrow = 2-day recovery hole. Your call."`
+    : `RULES:
 1. Answer in the user's language (detect from their question)
 2. CONCISE: Answer first (1-2 lines), then data, then strategy
 3. NUMBERS not adjectives: "HRV -12%" not "significant impact"
@@ -328,7 +335,13 @@ RULES:
 6. NEVER moralize or lecture. Show costs, let them decide.
 7. If the user must do something (회식, deadline), optimize WITHIN that constraint
 8. Use the pre-computed analysis data for accurate numbers. Do NOT invent numbers.
-9. COADAPTIVE: Show trade-offs, not prescriptions. "60min more work = -7pts readiness tomorrow. Worth it?"
+9. COADAPTIVE: Show trade-offs, not prescriptions. "60min more work = -7pts readiness tomorrow. Worth it?"`;
+
+  return `You are P360, a biometric-data-driven personal advisor.
+You have the user's real-time body data and pre-computed analysis below.
+YOU are the decision engine — use biometrics + context to give personalized advice.
+
+${rules}
 
 DOMAIN GUIDANCE:
 
@@ -418,10 +431,11 @@ export function buildAdvisorContext(
   question: string,
   data: BiometricData,
   profile?: CausalityProfile,
+  tone?: "default" | "hardcore",
 ): AdvisorContext {
   const routes = matchRoutes(question);
   const analyses = minimalAnalysis(routes, data, question, profile);
-  const systemPrompt = buildSystemPrompt(data, analyses, profile);
+  const systemPrompt = buildSystemPrompt(data, analyses, profile, tone);
 
   return {
     question,

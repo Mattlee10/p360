@@ -18,6 +18,9 @@ import {
   handleDemo,
   handleUnknown,
 } from "./bot/handlers";
+import { getConnectedUsers } from "./lib/storage";
+import { getAskResponse } from "./lib/ask";
+import { generateDailyDecisionQuestion, formatDailyNudgeHeader } from "./lib/daily-nudge";
 
 // Load environment variables
 dotenv.config();
@@ -120,6 +123,40 @@ function scheduleCronJobs() {
           } catch (err) {
             console.error("[cron] Failed to save profile:", err instanceof Error ? err.message : err);
           }
+        }
+      }
+
+      // Daily Shame Bot nudge: send opportunity cost report to all connected users
+      const connectedUsers = getConnectedUsers();
+      console.log(`[cron] Sending daily nudge to ${connectedUsers.length} connected users`);
+
+      for (const user of connectedUsers) {
+        try {
+          const userProvider = new OuraProvider();
+          const userData = await userProvider.fetchBiometricData(user.providerToken);
+          if (!userData) {
+            console.log(`[cron] No data for user ${user.telegramId}, skipping nudge`);
+            continue;
+          }
+
+          const question = generateDailyDecisionQuestion(userData);
+          const userIdStr = `tg-${user.telegramId}`;
+          const nudgeResponse = await getAskResponse(
+            question,
+            userData,
+            userIdStr,
+            eventStore,
+            undefined,
+            "hardcore",
+          );
+
+          const header = formatDailyNudgeHeader(userData);
+          const message = `${header}\n\n${nudgeResponse}`;
+
+          await bot.api.sendMessage(user.telegramId, message, { parse_mode: "HTML" });
+          console.log(`[cron] ✅ Daily nudge sent to user ${user.telegramId}`);
+        } catch (err) {
+          console.error(`[cron] Failed to send nudge to user ${user.telegramId}:`, err instanceof Error ? err.message : err);
         }
       }
 
