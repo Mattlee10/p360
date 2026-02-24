@@ -1,12 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { BiometricData, EventStore, CausalityProfile, ActivityConfoundingReport } from "@p360/core";
+import type { BiometricData, EventStore, CausalityProfile } from "@p360/core";
 import {
   prepareAsk,
   processAskResponse,
   collectEvent,
   getNudgeVerdictEmoji,
   createSupabaseProfileStore,
-  ActivityConfoundingAnalyzer,
 } from "@p360/core";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -20,7 +19,6 @@ export async function getAskResponse(
   data: BiometricData,
   userId?: string,
   eventStore?: EventStore,
-  activityConfounding?: ActivityConfoundingReport,
   tone?: "default" | "hardcore",
 ): Promise<string> {
   if (!ANTHROPIC_API_KEY) {
@@ -50,7 +48,6 @@ export async function getAskResponse(
     userId,
     eventStore,
     profile,
-    activityConfounding,
     tone,
   });
 

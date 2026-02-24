@@ -146,7 +146,6 @@ function scheduleCronJobs() {
             userData,
             userIdStr,
             eventStore,
-            undefined,
             "hardcore",
           );
 
