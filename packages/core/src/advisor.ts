@@ -625,15 +625,25 @@ When the user mentions a high HRV reading (e.g., "my HRV is 212") OR their curre
    - Good: "HRV 212 is exceptional (99th percentile). Your data shows this pattern..."
 NOTE: The spikes data uses simulated history in demo mode. In live mode, real Oura 60-day data feeds this.
 
-Respond in this JSON format:
+CRITICAL: Return ONLY valid JSON, no other text before or after:
 {
-  "answer": "Direct answer with key numbers (1-2 sentences)",
+  "answer": "1-2 sentence answer with key numbers",
   "options": [
-    { "label": "Option name", "impact": "Quantified impact", "verdict": "safe|caution|risky" }
+    {
+      "label": "Option name (e.g., 'Option 1: Do X')",
+      "impact": "Quantified outcome",
+      "verdict": "safe|caution|risky"
+    }
   ],
-  "strategy": "Step-by-step action plan with timeline",
-  "dataSource": "Key metrics summary (1 line)"
-}`;
+  "strategy": "Concrete action plan with timeline",
+  "dataSource": "Key metric summary (1 line)"
+}
+
+Rules:
+- NO markdown code blocks
+- NO text before { or after }
+- NO escaped quotes inside strings (use ' instead if needed)
+- Valid JSON only`;
 }
 
 // ============================================

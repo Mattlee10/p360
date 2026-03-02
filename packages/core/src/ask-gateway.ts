@@ -57,16 +57,28 @@ const DOMAIN_QUESTIONS: Record<string, string> = {
 
 export function parseNudgeResponse(text: string): NudgeResponse | null {
   try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    const parsed = JSON.parse(jsonMatch[0]);
+    // Remove markdown code blocks (```json ... ```)
+    let cleanText = text.replace(/^```(?:json)?\s*/m, "").replace(/\s*```$/m, "");
+
+    // Find JSON object: first { to last }
+    const openBrace = cleanText.indexOf("{");
+    const closeBrace = cleanText.lastIndexOf("}");
+
+    if (openBrace === -1 || closeBrace === -1 || closeBrace <= openBrace) {
+      return null;
+    }
+
+    const jsonStr = cleanText.substring(openBrace, closeBrace + 1);
+    const parsed = JSON.parse(jsonStr);
+
     return {
       answer: parsed.answer || "",
       options: Array.isArray(parsed.options) ? parsed.options : [],
       strategy: parsed.strategy || "",
       dataSource: parsed.dataSource || "",
     };
-  } catch {
+  } catch (err) {
+    // Silent fail - will return raw text instead
     return null;
   }
 }
