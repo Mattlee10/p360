@@ -1,4 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { readFileSync } from "fs";
+import { homedir } from "os";
+import { join } from "path";
 import type { BiometricData, EventStore, CausalityProfile } from "@p360/core";
 import {
   prepareAsk,
@@ -28,6 +31,7 @@ export async function getAskResponse(
   // 1. Load profile if available
   let profile: CausalityProfile | undefined;
   if (userId) {
+    // 1a. Try Supabase first
     const profileStore = createSupabaseProfileStore();
     if (profileStore) {
       try {
@@ -37,6 +41,20 @@ export async function getAskResponse(
         }
       } catch (err) {
         // Profile loading failed, continue without it
+      }
+    }
+
+    // 1b. Fallback: ~/.p360/config.json (dogfood / local dev)
+    if (!profile) {
+      try {
+        const configPath = join(homedir(), ".p360", "config.json");
+        const raw = readFileSync(configPath, "utf-8");
+        const config = JSON.parse(raw) as { personalProfile?: CausalityProfile };
+        if (config.personalProfile) {
+          profile = config.personalProfile;
+        }
+      } catch (err) {
+        // No config file or no personalProfile key, continue without it
       }
     }
   }
@@ -54,7 +72,7 @@ export async function getAskResponse(
   // 3. Call Claude API
   const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
   const response = await client.messages.create({
-    model: "claude-sonnet-4-5-20250929",
+    model: "claude-haiku-4-5-20251001",
     max_tokens: 1024,
     system: prepared.systemPrompt,
     messages: [{ role: "user", content: prepared.question }],

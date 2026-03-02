@@ -460,19 +460,38 @@ export function buildSystemPrompt(
   const biometrics = formatBiometrics(data);
   const analysisJson = JSON.stringify(analyses, null, 2);
 
-  // Phase 2: Personal patterns section (only if CausalityProfile exists)
-  // 현재는 population defaults 사용, Phase 2에서 개인화 데이터 주입
+  // Personal constants + patterns section (inject when CausalityProfile exists)
   let personalSection = "";
-  if (profile && profile.patterns.length > 0) {
-    const patternLines = profile.patterns.map((p) => `- ${p.description}`).join("\n");
-    personalSection = `
+  if (profile) {
+    const lines: string[] = [];
 
-PERSONAL PATTERNS (learned from ${profile.totalEvents} historical events):
-${patternLines}
-IMPORTANT: These are THIS user's actual measured sensitivities, not population averages.
-The pre-computed analysis already uses these personal values. Reference them in your response.`;
+    const c = profile.personalConstants;
+    if (c.workoutRecoveryThreshold !== undefined)
+      lines.push(`- Workout readiness threshold: ${c.workoutRecoveryThreshold} (population: 70)`);
+    if (c.alcoholHrvDropPerDrink !== undefined)
+      lines.push(`- Alcohol HRV sensitivity: ${c.alcoholHrvDropPerDrink}%/drink (population: 4.5%)`);
+    if (c.alcoholRecoveryDropPerDrink !== undefined)
+      lines.push(`- Alcohol recovery cost: ${c.alcoholRecoveryDropPerDrink}pts readiness/drink (population: 4.2)`);
+    if (c.personalDrinkLimit !== undefined)
+      lines.push(`- Personal drink limit: ${c.personalDrinkLimit} drinks (population: 3)`);
+    if (c.caffeineSleepImpactPerCup !== undefined)
+      lines.push(`- Caffeine sleep impact: ${c.caffeineSleepImpactPerCup}pts/cup (population: 4)`);
+    if (c.caffeineHalfLifeHours !== undefined)
+      lines.push(`- Caffeine half-life: ${c.caffeineHalfLifeHours}h (population: 6h)`);
+
+    if (profile.patterns.length > 0) {
+      profile.patterns.forEach((p) => lines.push(`- ${p.description}`));
+    }
+
+    if (lines.length > 0) {
+      personalSection = `
+
+PERSONAL CONSTANTS — USE THESE INSTEAD OF POPULATION DEFAULTS:
+${lines.join("\n")}
+Source: ${profile.totalEvents > 0 ? `${profile.totalEvents} events` : "manual calibration"}
+IMPORTANT: Override any generic thresholds/defaults with the values above.`;
+    }
   }
-
   const rules = tone === "hardcore"
     ? `HARDCORE MODE — NO FLUFF:
 1. Numbers only. No encouragement. No emojis (except verdict: 🟢🟡🔴).

@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "install-all": "npm install && npm install --workspace=apps/telegram --workspace=apps/discord --workspace=packages/core",
+    "dogfood": "node apps/cli/node_modules/typescript/bin/tsc --project scripts/tsconfig.json --typeRoots apps/cli/node_modules/@types 2>/dev/null; NODE_PATH=apps/cli/node_modules:packages/core/node_modules node .tmp/scripts/dogfood-analyze.js",
     "build": "npm run build --workspace=packages/core && npm run build --workspace=apps/telegram",
     "build-telegram": "cd apps/telegram && npm run build",
     "build-discord": "cd apps/discord && npm run build",
