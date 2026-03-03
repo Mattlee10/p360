@@ -6,8 +6,8 @@ import {
   createSupabaseEventStore,
   createSupabaseProfileStore,
   buildCausalityProfile,
+  OuraProvider,
 } from "@p360/core";
-import { OuraProvider } from "@p360/core";
 import {
   handleStart,
   handleHelp,
@@ -81,86 +81,66 @@ function scheduleCronJobs() {
 
     try {
       const eventStore = createSupabaseEventStore();
+      const profileStore = createSupabaseProfileStore();
 
       if (!eventStore) {
         console.log("[cron] Supabase not configured (missing SUPABASE_URL/SUPABASE_ANON_KEY)");
         return;
       }
 
-      const ouraToken = process.env.OURA_API_KEY;
-      if (!ouraToken) {
-        console.log("[cron] Oura API token not configured");
-        return;
-      }
-
-      const ouraProvider = new OuraProvider();
-      const userId = process.env.P360_USER_ID || "cli-default";
-
-      // Fetch today's biometric data from Oura
-      const data = await ouraProvider.fetchBiometricData(ouraToken);
-
-      if (!data) {
-        console.log("[cron] No biometric data available for", userId);
-        return;
-      }
-
-      // Resolve pending outcomes (24h+ old without outcome)
-      const resolved = await resolveOutcomes(eventStore, userId, data);
-      console.log(`[cron] ✅ Resolved ${resolved} pending outcomes for ${userId}`);
-
-      // Check if we have 5+ events to build a profile
-      const events = await eventStore.getByUser(userId, 100);
-
-      if (events.length >= 5) {
-        const profileStore = createSupabaseProfileStore();
-        if (profileStore) {
-          try {
-            const profile = buildCausalityProfile(userId, events);
-            await profileStore.saveProfile(profile);
-            console.log(`[cron] ✅ Generated CausalityProfile for ${userId} (${events.length} events)`);
-            console.log(`[cron]    - Personal HRV sensitivity: ${profile.personalConstants.alcoholHrvDropPerDrink}%`);
-            console.log(`[cron]    - Personal drink limit: ${profile.personalConstants.personalDrinkLimit} drinks`);
-          } catch (err) {
-            console.error("[cron] Failed to save profile:", err instanceof Error ? err.message : err);
-          }
-        }
-      }
-
-      // Daily Shame Bot nudge: send opportunity cost report to all connected users
       const connectedUsers = getConnectedUsers();
-      console.log(`[cron] Sending daily nudge to ${connectedUsers.length} connected users`);
+      console.log(`[cron] Processing ${connectedUsers.length} connected users`);
 
       for (const user of connectedUsers) {
+        const userId = `tg-${user.telegramId}`;
         try {
           const userProvider = new OuraProvider();
           const userData = await userProvider.fetchBiometricData(user.providerToken);
           if (!userData) {
-            console.log(`[cron] No data for user ${user.telegramId}, skipping nudge`);
+            console.log(`[cron] No data for user ${user.telegramId}, skipping`);
             continue;
           }
 
+          // 1. Resolve pending outcomes
+          const resolved = await resolveOutcomes(eventStore, userId, userData);
+          if (resolved > 0) {
+            console.log(`[cron] ✅ Resolved ${resolved} pending outcomes for ${userId}`);
+          }
+
+          // 2. Build profile if 5+ events
+          if (profileStore) {
+            const events = await eventStore.getByUser(userId, 100);
+            if (events.length >= 5) {
+              try {
+                const profile = buildCausalityProfile(userId, events);
+                await profileStore.saveProfile(profile);
+                console.log(`[cron] ✅ Profile updated for ${userId} (${events.length} events)`);
+              } catch (err) {
+                console.error(`[cron] Failed to save profile for ${userId}:`, err instanceof Error ? err.message : err);
+              }
+            }
+          }
+
+          // 3. Send daily nudge
           const question = generateDailyDecisionQuestion(userData);
-          const userIdStr = `tg-${user.telegramId}`;
           const nudgeResponse = await getAskResponse(
             question,
             userData,
-            userIdStr,
+            userId,
             eventStore,
             "hardcore",
           );
 
           const header = formatDailyNudgeHeader(userData);
-          const message = `${header}\n\n${nudgeResponse}`;
-
-          await bot.api.sendMessage(user.telegramId, message, { parse_mode: "HTML" });
+          await bot.api.sendMessage(user.telegramId, `${header}\n\n${nudgeResponse}`, { parse_mode: "HTML" });
           console.log(`[cron] ✅ Daily nudge sent to user ${user.telegramId}`);
         } catch (err) {
-          console.error(`[cron] Failed to send nudge to user ${user.telegramId}:`, err instanceof Error ? err.message : err);
+          console.error(`[cron] Failed to process user ${user.telegramId}:`, err instanceof Error ? err.message : err);
         }
       }
 
     } catch (error) {
-      console.error("[cron] Error resolving outcomes:", error instanceof Error ? error.message : error);
+      console.error("[cron] Error in daily cron:", error instanceof Error ? error.message : error);
     }
   });
 
