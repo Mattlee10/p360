@@ -70,7 +70,7 @@ export async function askCommand(
     // 3. Call Claude API
     const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
-      model: "claude-sonnet-4-5-20250929",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 1024,
       system: prepared.systemPrompt,
       messages: [{ role: "user", content: prepared.question }],
