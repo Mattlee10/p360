@@ -19,7 +19,8 @@ import {
   handleTimezone,
   handleUnknown,
 } from "./bot/handlers";
-import { getConnectedUsers } from "./lib/storage";
+import { getConnectedUsers, preloadUsers } from "./lib/storage";
+import { loadAllUsersFromSupabase } from "./lib/supabase-user-store";
 import { getAskResponse } from "./lib/ask";
 import { generateDailyDecisionQuestion, formatDailyNudgeHeader } from "./lib/daily-nudge";
 
@@ -149,14 +150,25 @@ function scheduleCronJobs() {
   console.log("[cron] ✅ Cron job scheduled: Daily outcome resolution at 00:00 UTC (09:00 KST)");
 }
 
-// Schedule cron jobs BEFORE starting bot
-process.stdout.write("🤖 P360 Telegram Bot starting...\n");
-process.stdout.write("[cron] Initializing cron scheduling...\n");
-scheduleCronJobs();
-process.stdout.write("[cron] Cron initialization complete\n");
-process.stdout.write("\n");
+// Preload users from Supabase before starting bot
+async function initAndStart() {
+  process.stdout.write("🤖 P360 Telegram Bot starting...\n");
 
-bot.start({
+  // Railway 재시작 후 유저 데이터 복원
+  try {
+    const persistedUsers = await loadAllUsersFromSupabase();
+    preloadUsers(persistedUsers);
+  } catch (err) {
+    console.warn("[startup] Failed to preload users from Supabase (continuing):", err);
+  }
+
+  // Schedule cron jobs BEFORE starting bot
+  process.stdout.write("[cron] Initializing cron scheduling...\n");
+  scheduleCronJobs();
+  process.stdout.write("[cron] Cron initialization complete\n");
+  process.stdout.write("\n");
+
+  bot.start({
   onStart: (botInfo) => {
     console.log(`✅ Bot started: @${botInfo.username}`);
     console.log("");
@@ -170,4 +182,10 @@ bot.start({
     console.log("");
     console.log("Press Ctrl+C to stop");
   },
+  });
+}
+
+initAndStart().catch((err) => {
+  console.error("Fatal startup error:", err);
+  process.exit(1);
 });

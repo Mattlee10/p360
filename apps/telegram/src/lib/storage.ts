@@ -1,8 +1,13 @@
-// Simple in-memory storage for MVP
-// TODO: Replace with Supabase for production
+// Hybrid storage: in-memory (L1 cache) + Supabase (L2 persistent)
+// Railway 재시작 후에도 provider token, timezone 유지
 
 import type { ProviderType, MoodEntry } from "@p360/core";
 import { DrinkLog } from "./drink";
+import {
+  saveUserToSupabase,
+  getUserFromSupabase,
+  type PersistedUserData,
+} from "./supabase-user-store";
 
 interface UserData {
   telegramId: number;
@@ -27,6 +32,50 @@ export function getUser(telegramId: number): UserData | undefined {
   return users.get(telegramId);
 }
 
+/**
+ * in-memory miss 시 Supabase에서 로드 후 캐시에 저장
+ * /connect, /ask 최초 호출 시 사용
+ */
+export async function getUserWithFallback(telegramId: number): Promise<UserData | undefined> {
+  const cached = users.get(telegramId);
+  if (cached) return cached;
+
+  const persisted = await getUserFromSupabase(telegramId);
+  if (!persisted) return undefined;
+
+  // Supabase 데이터로 in-memory 복원
+  const restored: UserData = {
+    telegramId,
+    provider: persisted.provider as ProviderType | undefined,
+    providerToken: persisted.provider_token,
+    ouraToken: persisted.oura_token,
+    timezone: persisted.timezone,
+    createdAt: persisted.created_at ? new Date(persisted.created_at) : new Date(),
+  };
+  users.set(telegramId, restored);
+  return restored;
+}
+
+/**
+ * Supabase에서 전체 유저 목록을 in-memory로 preload
+ * 앱 시작 시 호출
+ */
+export function preloadUsers(persistedUsers: PersistedUserData[]): void {
+  for (const p of persistedUsers) {
+    if (!users.has(p.telegram_id)) {
+      users.set(p.telegram_id, {
+        telegramId: p.telegram_id,
+        provider: p.provider as ProviderType | undefined,
+        providerToken: p.provider_token,
+        ouraToken: p.oura_token,
+        timezone: p.timezone,
+        createdAt: p.created_at ? new Date(p.created_at) : new Date(),
+      });
+    }
+  }
+  console.log(`[storage] Preloaded ${persistedUsers.length} users from Supabase`);
+}
+
 export function setUser(telegramId: number, data: Partial<UserData>): UserData {
   const existing = users.get(telegramId);
   const updated: UserData = {
@@ -36,6 +85,18 @@ export function setUser(telegramId: number, data: Partial<UserData>): UserData {
     ...data,
   };
   users.set(telegramId, updated);
+
+  // Supabase 영구 저장 (fire-and-forget) — critical fields only
+  const persisted: PersistedUserData = {
+    telegram_id: telegramId,
+    provider: updated.provider,
+    provider_token: updated.providerToken,
+    oura_token: updated.ouraToken,
+    timezone: updated.timezone,
+    created_at: updated.createdAt.toISOString(),
+  };
+  saveUserToSupabase(persisted).catch(() => {});
+
   return updated;
 }
 
