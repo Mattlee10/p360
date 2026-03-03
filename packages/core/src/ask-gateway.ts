@@ -20,6 +20,8 @@ export interface AskRequest {
   eventStore?: EventStore;
   /** Tone override: "hardcore" = numbers only, no fluff (Shame Bot mode) */
   tone?: "default" | "hardcore";
+  /** User's IANA timezone (e.g. "Asia/Seoul"). Falls back to server timezone if not set. */
+  timezone?: string;
 }
 
 export interface AskPrepared {
@@ -180,15 +182,32 @@ export async function collectEvent(
     result.analyses,
     request.biometricData,
     request.userId,
+    request.timezone,
   );
 
   if (!event) {
     return;
   }
 
-  // Claude의 verdict를 recommendation에 추가
-  if (result.nudge && event.recommendation) {
-    event.recommendation.verdict = result.nudge.options[0]?.verdict ?? event.recommendation.verdict;
+  // Claude 응답에서 recommendation 항상 설정
+  // (extractRecommendation이 analyses 구조에 따라 null 반환할 수 있으므로 항상 덮어씀)
+  if (result.nudge) {
+    const claudeVerdict = result.nudge.options[0]?.verdict ?? "safe";
+    // safe/caution/risky → green/yellow/red 매핑
+    const verdictMap: Record<string, string> = {
+      safe: "green",
+      caution: "yellow",
+      risky: "red",
+    };
+    const verdict = verdictMap[claudeVerdict] ?? claudeVerdict;
+
+    event.recommendation = {
+      verdict,
+      domain: event.domain,
+      ...(event.recommendation?.suggestedLimit !== undefined
+        ? { suggestedLimit: event.recommendation.suggestedLimit }
+        : {}),
+    };
   }
 
   try {

@@ -11,6 +11,16 @@ import {
   getProviderToken,
   hasConnectedDevice,
 } from "../lib/storage";
+
+// IANA timezone 유효성 검사
+function isValidTimezone(tz: string): boolean {
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
 import {
   fetchBiometricData,
   validateToken,
@@ -77,8 +87,9 @@ async function routeThroughAsk(
     }
 
     const userId = `tg-${telegramId}`;
+    const userTimezone = getUser(telegramId)?.timezone;
 
-    const message = await getAskResponse(question, data, userId, eventStore);
+    const message = await getAskResponse(question, data, userId, eventStore, undefined, userTimezone);
     updateLastCheck(telegramId);
 
     // Resolve yesterday's pending outcomes (fire-and-forget)
@@ -217,6 +228,36 @@ export async function handleDemo(ctx: Context) {
   }
 
   await routeThroughAsk(ctx, question, "demo", true);
+}
+
+// /timezone command - set user's local timezone
+export async function handleTimezone(ctx: Context) {
+  const telegramId = ctx.from?.id;
+  if (!telegramId) return;
+
+  const text = ctx.message?.text || "";
+  const parts = text.split(" ").filter((p) => p.trim());
+
+  if (parts.length < 2) {
+    const current = getUser(telegramId)?.timezone ?? "Not set (using UTC)";
+    await reply(
+      ctx,
+      `🌍 <b>Timezone Settings</b>\n\nCurrent: <code>${current}</code>\n\nUsage: /timezone [IANA timezone]\n\nExamples:\n• /timezone Asia/Seoul\n• /timezone America/New_York\n• /timezone Europe/London\n• /timezone UTC`,
+    );
+    return;
+  }
+
+  const tz = parts[1].trim();
+  if (!isValidTimezone(tz)) {
+    await reply(
+      ctx,
+      `❌ Invalid timezone: <code>${tz}</code>\n\nUse IANA format. Examples:\n• Asia/Seoul\n• America/New_York\n• Europe/London`,
+    );
+    return;
+  }
+
+  setUser(telegramId, { timezone: tz });
+  await reply(ctx, `✅ Timezone set to <code>${tz}</code>\n\nYour coffee/drink times will now be recorded in your local time.`);
 }
 
 // Handle unknown commands

@@ -23,6 +23,7 @@ export async function getAskResponse(
   userId?: string,
   eventStore?: EventStore,
   tone?: "default" | "hardcore",
+  timezone?: string,
 ): Promise<string> {
   if (!ANTHROPIC_API_KEY) {
     return "⚠️ <b>Ask feature not configured</b>\n\nServer admin needs to set ANTHROPIC_API_KEY.";
@@ -67,6 +68,7 @@ export async function getAskResponse(
     eventStore,
     profile,
     tone,
+    timezone,
   });
 
   // 3. Call Claude API

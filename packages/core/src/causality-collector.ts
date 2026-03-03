@@ -104,9 +104,14 @@ function generateId(): string {
  * 지원 패턴:
  *   한국어: "9시", "오전 9시", "오후 1시", "13시 30분"
  *   영어:   "9am", "1pm", "9:00am", "13:00", "9 AM"
+ *
+ * 규칙:
+ *   1. 한국어/영어 am/pm 표시가 있는 시간을 우선 추출
+ *   2. 명시적 표시 시간이 없을 때만 24h 형식 사용 (오탐 방지)
+ *   3. 최대 3개 (과다 추출 방지)
  */
 function extractTimes(question: string): string[] | undefined {
-  const times: string[] = [];
+  const markedTimes: string[] = [];
 
   // 한국어 패턴: "오전 9시", "오후 1시 30분", "9시", "13시"
   const krPattern = /(?:(오전|오후)\s*)?(\d{1,2})시(?:\s*(\d{1,2})분)?/g;
@@ -117,11 +122,11 @@ function extractTimes(question: string): string[] | undefined {
     if (m[1] === "오후" && hour < 12) hour += 12;
     if (m[1] === "오전" && hour === 12) hour = 0;
     if (hour >= 0 && hour <= 23) {
-      times.push(`${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`);
+      markedTimes.push(`${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`);
     }
   }
 
-  // 영어 패턴: "9am", "1pm", "9:30am", "13:00", "9 AM"
+  // 영어 패턴: "9am", "1pm", "9:30am", "9 AM"
   const enPattern = /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/gi;
   while ((m = enPattern.exec(question)) !== null) {
     let hour = parseInt(m[1], 10);
@@ -130,23 +135,28 @@ function extractTimes(question: string): string[] | undefined {
     if (meridiem === "pm" && hour < 12) hour += 12;
     if (meridiem === "am" && hour === 12) hour = 0;
     if (hour >= 0 && hour <= 23) {
-      times.push(`${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`);
+      markedTimes.push(`${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`);
     }
   }
 
   // 24시간 형식 (am/pm 없음): "13:00", "09:30"
-  const h24Pattern = /\b([01]\d|2[0-3]):([0-5]\d)\b/g;
-  while ((m = h24Pattern.exec(question)) !== null) {
-    const candidate = `${m[1]}:${m[2]}`;
-    // 이미 추가된 시간과 중복 방지
-    if (!times.includes(candidate)) {
-      times.push(candidate);
+  // 명시적 표시 시간이 없을 때만 사용 (오탐 방지)
+  const times: string[] = [...markedTimes];
+  if (markedTimes.length === 0) {
+    const h24Pattern = /\b([01]\d|2[0-3]):([0-5]\d)\b/g;
+    while ((m = h24Pattern.exec(question)) !== null) {
+      const candidate = `${m[1]}:${m[2]}`;
+      if (!times.includes(candidate)) {
+        times.push(candidate);
+      }
     }
   }
 
-  // 시간순 정렬
-  times.sort();
-  return times.length > 0 ? times : undefined;
+  // 중복 제거 후 시간순 정렬, 최대 3개
+  const unique = [...new Set(times)];
+  unique.sort();
+  const result = unique.slice(0, 3);
+  return result.length > 0 ? result : undefined;
 }
 
 /**
@@ -283,6 +293,7 @@ export function extractEventFromAsk(
   analyses: Record<string, unknown>,
   biometrics: BiometricData,
   userId: string,
+  userTimezone?: string,
 ): CausalityEvent | null {
   // Resolve effective routes: even if route is "general", capture exercise events.
   // e.g. "My HRV is 212, I did incline walk" → routes=["tired"] → still save as workout
@@ -303,7 +314,7 @@ export function extractEventFromAsk(
       ? "workout"
       : domain;
 
-  const action = buildAction(resolvedDomain, question, analyses);
+  const action = buildAction(resolvedDomain, question, analyses, userTimezone);
 
   if (!action) return null;
 
@@ -335,8 +346,9 @@ function buildAction(
   domain: CausalityDomain,
   question: string,
   _analyses: Record<string, unknown>,
+  userTimezone?: string,
 ): CausalityAction | null {
-  const timezone = getLocalTimezone();
+  const timezone = userTimezone || getLocalTimezone();
 
   switch (domain) {
     case "drink": {
