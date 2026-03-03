@@ -5,7 +5,18 @@
  * Phase 2에서 SupabaseProfileStore 클래스/ProfileStore 인터페이스 직접 export 활성화 예정
  */
 
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseClient = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type CreateClientFn = (...args: any[]) => SupabaseClient;
+let _createClient: CreateClientFn | null = null;
+function getCreateClient(): CreateClientFn {
+  if (!_createClient) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    _createClient = require("@supabase/supabase-js").createClient as CreateClientFn;
+  }
+  return _createClient!;
+}
 import type {
   CausalityProfile,
   PersonalConstants,
@@ -88,6 +99,6 @@ export function createSupabaseProfileStore(): SupabaseProfileStore | null {
     return null;
   }
 
-  const client = createClient(url, key);
+  const client = getCreateClient()(url, key);
   return new SupabaseProfileStore(client);
 }

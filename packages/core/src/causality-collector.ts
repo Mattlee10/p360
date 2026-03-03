@@ -95,6 +95,72 @@ function generateId(): string {
 // 질문에서 Action 자동 추출
 // ============================================
 
+// ============================================
+// 시간 파싱 (로컬 시간 기준, timezone 자동 감지)
+// ============================================
+
+/**
+ * 질문에서 시간 목록을 추출. 모두 24시간 "HH:MM" 형식으로 반환.
+ * 지원 패턴:
+ *   한국어: "9시", "오전 9시", "오후 1시", "13시 30분"
+ *   영어:   "9am", "1pm", "9:00am", "13:00", "9 AM"
+ */
+function extractTimes(question: string): string[] | undefined {
+  const times: string[] = [];
+
+  // 한국어 패턴: "오전 9시", "오후 1시 30분", "9시", "13시"
+  const krPattern = /(?:(오전|오후)\s*)?(\d{1,2})시(?:\s*(\d{1,2})분)?/g;
+  let m: RegExpExecArray | null;
+  while ((m = krPattern.exec(question)) !== null) {
+    let hour = parseInt(m[2], 10);
+    const minute = m[3] ? parseInt(m[3], 10) : 0;
+    if (m[1] === "오후" && hour < 12) hour += 12;
+    if (m[1] === "오전" && hour === 12) hour = 0;
+    if (hour >= 0 && hour <= 23) {
+      times.push(`${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`);
+    }
+  }
+
+  // 영어 패턴: "9am", "1pm", "9:30am", "13:00", "9 AM"
+  const enPattern = /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/gi;
+  while ((m = enPattern.exec(question)) !== null) {
+    let hour = parseInt(m[1], 10);
+    const minute = m[2] ? parseInt(m[2], 10) : 0;
+    const meridiem = m[3].toLowerCase();
+    if (meridiem === "pm" && hour < 12) hour += 12;
+    if (meridiem === "am" && hour === 12) hour = 0;
+    if (hour >= 0 && hour <= 23) {
+      times.push(`${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`);
+    }
+  }
+
+  // 24시간 형식 (am/pm 없음): "13:00", "09:30"
+  const h24Pattern = /\b([01]\d|2[0-3]):([0-5]\d)\b/g;
+  while ((m = h24Pattern.exec(question)) !== null) {
+    const candidate = `${m[1]}:${m[2]}`;
+    // 이미 추가된 시간과 중복 방지
+    if (!times.includes(candidate)) {
+      times.push(candidate);
+    }
+  }
+
+  // 시간순 정렬
+  times.sort();
+  return times.length > 0 ? times : undefined;
+}
+
+/**
+ * 시스템 timezone을 IANA 형식으로 반환.
+ * Node.js 환경에서 Intl.DateTimeFormat 사용.
+ */
+function getLocalTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return "UTC";
+  }
+}
+
 const AMOUNT_PATTERNS = [
   // "맥주 3잔", "beer 3", "3 beers", "3잔"
   /(\d+)\s*(?:잔|병|cups?|glasses?|shots?|drinks?|beers?|bottles?)/i,
@@ -270,33 +336,41 @@ function buildAction(
   question: string,
   _analyses: Record<string, unknown>,
 ): CausalityAction | null {
+  const timezone = getLocalTimezone();
+
   switch (domain) {
     case "drink": {
       const substance = extractSubstance(question);
       const amount = extractAmount(question);
+      const times = extractTimes(question);
       return {
         type: "drank",
         amount,
         detail: substance ?? "alcohol",
+        ...(times ? { times, timezone } : {}),
       };
     }
 
     case "workout": {
       const sport = extractSport(question);
       const duration = extractDuration(question);
+      const times = extractTimes(question);
       return {
         type: "worked_out",
         detail: sport ?? "general",
         ...(duration !== undefined ? { amount: duration } : {}),
+        ...(times ? { times, timezone } : {}),
       };
     }
 
     case "coffee": {
       const amount = extractAmount(question);
+      const times = extractTimes(question);
       return {
         type: "drank_coffee",
         amount,
         detail: extractSubstance(question) ?? "coffee",
+        ...(times ? { times, timezone } : {}),
       };
     }
 

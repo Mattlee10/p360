@@ -5,7 +5,18 @@
  * Phase 2에서 SupabaseEventStore 클래스 직접 export 활성화 예정
  */
 
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseClient = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type CreateClientFn = (...args: any[]) => SupabaseClient;
+let _createClient: CreateClientFn | null = null;
+function getCreateClient(): CreateClientFn {
+  if (!_createClient) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    _createClient = require("@supabase/supabase-js").createClient as CreateClientFn;
+  }
+  return _createClient!;
+}
 import type {
   CausalityEvent,
   CausalityOutcome,
@@ -68,7 +79,7 @@ export class SupabaseEventStore implements EventStore {
   private client: SupabaseClient;
 
   constructor(supabaseUrl: string, supabaseAnonKey: string) {
-    this.client = createClient(supabaseUrl, supabaseAnonKey);
+    this.client = getCreateClient()(supabaseUrl, supabaseAnonKey);
   }
 
   async save(event: CausalityEvent): Promise<void> {

@@ -28,6 +28,8 @@ export interface CausalityAction {
   type: string;       // "drank", "worked_out", "drank_coffee", "asked_about"
   amount?: number;    // 3 (drinks), 60 (minutes), 2 (cups)
   detail?: string;    // "beer", "basketball", "espresso"
+  times?: string[];   // ["09:00", "13:00"] — local time (HH:MM, 24h)
+  timezone?: string;  // "Asia/Seoul", "America/Los_Angeles" — IANA timezone
 }
 
 export interface CausalityRecommendation {
