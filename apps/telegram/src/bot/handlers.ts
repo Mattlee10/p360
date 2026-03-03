@@ -18,7 +18,7 @@ import {
   getProviderDisplayName,
 } from "../lib/data";
 import { getAskResponse, isAskAvailable } from "../lib/ask";
-import { createSupabaseEventStore } from "@p360/core";
+import { createSupabaseEventStore, resolveOutcomes } from "@p360/core";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
 
@@ -80,6 +80,12 @@ async function routeThroughAsk(
 
     const message = await getAskResponse(question, data, userId, eventStore);
     updateLastCheck(telegramId);
+
+    // Resolve yesterday's pending outcomes (fire-and-forget)
+    // 토큰이 살아있는 지금 처리 — cron 의존 없음
+    if (eventStore && !demo) {
+      resolveOutcomes(eventStore, userId, data).catch(() => {});
+    }
 
     const demoNote = demo
       ? `\n\n<i>📝 This is demo data. Use /connect to see your real data.</i>`
