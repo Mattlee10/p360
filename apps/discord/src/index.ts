@@ -622,7 +622,7 @@ function scheduleCronJobs() {
 
     try {
       if (!eventStore) {
-        console.log("[cron] Supabase not configured (missing SUPABASE_URL/SUPABASE_ANON_KEY)");
+        console.log("[cron] Supabase not configured (missing SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY)");
         return;
       }
 
