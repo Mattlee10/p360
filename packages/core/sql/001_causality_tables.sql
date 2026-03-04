@@ -29,13 +29,18 @@ CREATE TABLE causality_profiles (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- RLS (Row Level Security) - 각 유저는 자기 데이터만 접근
+-- RLS (Row Level Security) - anon 접근 차단, service_role만 허용
+-- 서버(Railway)는 SUPABASE_SERVICE_ROLE_KEY를 사용 → RLS 자동 bypass
 ALTER TABLE causality_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE causality_profiles ENABLE ROW LEVEL SECURITY;
 
--- 간단한 RLS: anon key로 모든 작업 허용 (서버 사이드에서만 사용)
-CREATE POLICY "Allow all operations" ON causality_events
-  FOR ALL USING (true) WITH CHECK (true);
+-- anon/authenticated 접근 전면 차단 (service_role은 RLS 무시)
+CREATE POLICY "Deny all anon access" ON causality_events
+  FOR ALL USING (false);
 
-CREATE POLICY "Allow all operations" ON causality_profiles
-  FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Deny all anon access" ON causality_profiles
+  FOR ALL USING (false);
+
+-- 기존 "Allow all operations" 정책이 있으면 먼저 삭제:
+-- DROP POLICY IF EXISTS "Allow all operations" ON causality_events;
+-- DROP POLICY IF EXISTS "Allow all operations" ON causality_profiles;

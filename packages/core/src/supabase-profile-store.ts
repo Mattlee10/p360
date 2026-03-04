@@ -93,7 +93,8 @@ export class SupabaseProfileStore implements ProfileStore {
  */
 export function createSupabaseProfileStore(): SupabaseProfileStore | null {
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_ANON_KEY;
+  // service_role key bypasses RLS — required for server-side usage
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY;
 
   if (!url || !key) {
     return null;
