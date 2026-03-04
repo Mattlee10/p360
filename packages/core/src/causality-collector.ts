@@ -190,6 +190,26 @@ const SUBSTANCE_KEYWORDS: Record<string, string> = {
   coffee: "coffee", 커피: "coffee", espresso: "coffee",
   에스프레소: "coffee", 아메리카노: "coffee", latte: "coffee", 라떼: "coffee",
   tea: "tea", 차: "tea", matcha: "tea", 마차: "tea",
+  // 음식
+  계란: "egg", egg: "egg", eggs: "egg",
+  닭: "chicken", chicken: "chicken",
+  고기: "meat", meat: "meat", beef: "beef", pork: "pork",
+  생선: "fish", fish: "fish",
+  샐러드: "salad", salad: "salad",
+  밥: "rice", rice: "rice",
+  빵: "bread", bread: "bread",
+  면: "noodle", pasta: "pasta", 파스타: "pasta", 라면: "ramen", ramen: "ramen",
+  치킨: "chicken", 피자: "pizza", pizza: "pizza",
+  버거: "burger", burger: "burger",
+  과일: "fruit", fruit: "fruit",
+  스무디: "smoothie", smoothie: "smoothie",
+  // 보충제
+  단백질: "protein", protein: "protein",
+  크레아틴: "creatine", creatine: "creatine",
+  비타민: "vitamin", vitamin: "vitamin",
+  오메가: "omega3", omega: "omega3",
+  마그네슘: "magnesium", magnesium: "magnesium",
+  보충제: "supplement", supplement: "supplement",
 };
 
 function extractAmount(question: string): number | undefined {
@@ -301,9 +321,8 @@ export function extractEventFromAsk(
   if (routes.length === 1 && routes[0] === "general") {
     if (extractSport(question) !== undefined) {
       effectiveRoutes = ["workout"];
-    } else {
-      return null;
     }
+    // general 도메인도 저장 (buildAction default case가 처리)
   }
 
   const domain = mapRouteToDomain(effectiveRoutes[0]);
@@ -336,6 +355,7 @@ function mapRouteToDomain(route: string): CausalityDomain {
     drink: "drink",
     workout: "workout",
     coffee: "coffee",
+    meal: "meal",
     tired: "general",
     cost: "drink", // cost는 보통 drink 관련
   };
@@ -386,8 +406,27 @@ function buildAction(
       };
     }
 
-    default:
-      return null;
+    case "meal": {
+      const substance = extractSubstance(question);
+      const amount = extractAmount(question);
+      const times = extractTimes(question);
+      return {
+        type: "ate",
+        detail: substance ?? "meal",
+        ...(amount !== undefined ? { amount } : {}),
+        ...(times ? { times, timezone } : {}),
+      };
+    }
+
+    default: {
+      // general 도메인도 저장 — raw question이 causality 단서
+      const times = extractTimes(question);
+      return {
+        type: "asked",
+        detail: question.slice(0, 200),
+        ...(times ? { times, timezone } : {}),
+      };
+    }
   }
 }
 

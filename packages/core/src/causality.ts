@@ -18,7 +18,7 @@ import type { BiometricData } from "./types";
 // Domain Types
 // ============================================
 
-export type CausalityDomain = "drink" | "workout" | "coffee" | "sleep" | "work" | "general";
+export type CausalityDomain = "drink" | "workout" | "coffee" | "meal" | "sleep" | "work" | "general";
 
 // ============================================
 // Event: 행동 기록 (/ask에서 자동 추출)

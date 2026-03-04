@@ -97,6 +97,19 @@ const ROUTES: RouteMatch[] = [
     ],
   },
   {
+    key: "meal",
+    keywords: [
+      // 한국어 음식/식사/보충제
+      "먹었", "먹었어", "먹었는데", "먹고", "먹을", "먹어도", "식사", "밥", "점심", "저녁", "아침",
+      "간식", "계란", "닭", "고기", "생선", "샐러드", "과일", "빵", "면", "파스타", "라면",
+      "치킨", "피자", "버거", "샌드위치", "국", "찌개", "스무디", "단백질", "탄수화물",
+      "보충제", "크레아틴", "비타민", "오메가",
+      // 영어 meal / supplement
+      "ate", "eating", "meal", "food", "lunch", "dinner", "breakfast", "snack",
+      "supplement", "protein", "creatine", "vitamin", "omega", "magnesium",
+    ],
+  },
+  {
     key: "confound",
     keywords: [
       "why is", "why am", "confused", "algorithm", "different", "gap",
