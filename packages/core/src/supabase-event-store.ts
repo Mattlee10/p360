@@ -129,14 +129,18 @@ export class SupabaseEventStore implements EventStore {
   }
 
   async getPendingOutcomes(userId: string): Promise<CausalityEvent[]> {
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // Use start of today (UTC midnight) as cutoff — not "24h ago".
+    // Events created during the day (e.g. 10:10 UTC) won't be 24h old
+    // when the midnight cron runs, but they ARE from "yesterday".
+    const startOfToday = new Date();
+    startOfToday.setUTCHours(0, 0, 0, 0);
 
     const { data, error } = await this.client
       .from("causality_events")
       .select("*")
       .eq("user_id", userId)
       .is("outcome", null)
-      .lt("timestamp", oneDayAgo.toISOString());
+      .lt("timestamp", startOfToday.toISOString());
 
     if (error) {
       throw new Error(`Failed to fetch pending outcomes: ${error.message}`);

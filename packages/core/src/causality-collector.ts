@@ -49,12 +49,13 @@ export class InMemoryEventStore implements EventStore {
   }
 
   async getPendingOutcomes(userId: string): Promise<CausalityEvent[]> {
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const startOfToday = new Date();
+    startOfToday.setUTCHours(0, 0, 0, 0);
     return this.events.filter(
       (e) =>
         e.userId === userId &&
         !e.outcome &&
-        e.timestamp < oneDayAgo,
+        e.timestamp < startOfToday,
     );
   }
 
@@ -170,6 +171,13 @@ function getLocalTimezone(): string {
     return "UTC";
   }
 }
+
+const FOOD_SUBSTANCES = new Set([
+  "egg", "chicken", "meat", "beef", "pork", "fish",
+  "salad", "rice", "bread", "noodle", "pasta", "ramen",
+  "pizza", "burger", "fruit", "smoothie",
+  "protein", "creatine", "vitamin", "omega3", "magnesium", "supplement",
+]);
 
 const AMOUNT_PATTERNS = [
   // "맥주 3잔", "beer 3", "3 beers", "3잔"
@@ -328,10 +336,18 @@ export function extractEventFromAsk(
   const domain = mapRouteToDomain(effectiveRoutes[0]);
 
   // If domain is "general" (e.g. routes=["tired"]) but question mentions exercise, override
-  const resolvedDomain: CausalityDomain =
+  let resolvedDomain: CausalityDomain =
     domain === "general" && extractSport(question) !== undefined
       ? "workout"
       : domain;
+
+  // If domain resolved to "drink" but substance is food, reclassify to "meal"
+  if (resolvedDomain === "drink") {
+    const substance = extractSubstance(question);
+    if (substance && FOOD_SUBSTANCES.has(substance)) {
+      resolvedDomain = "meal";
+    }
+  }
 
   const action = buildAction(resolvedDomain, question, analyses, userTimezone);
 

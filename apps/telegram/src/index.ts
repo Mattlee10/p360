@@ -124,13 +124,13 @@ function scheduleCronJobs() {
             }
           }
 
-          // 3. Send daily nudge
+          // 3. Send daily nudge (no eventStore — cron questions must not be saved as causality events)
           const question = generateDailyDecisionQuestion(userData);
           const nudgeResponse = await getAskResponse(
             question,
             userData,
             userId,
-            eventStore,
+            undefined,
             "hardcore",
           );
 
