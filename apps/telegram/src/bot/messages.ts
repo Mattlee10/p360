@@ -50,6 +50,9 @@ Examples:
 /status - Check connection status
 /disconnect - Remove device connection
 
+<b>📊 Your Data</b>
+/profile - See what p360 has learned about you
+
 <b>ℹ️ Help</b>
 /help - Show this message
 

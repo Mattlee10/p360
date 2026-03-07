@@ -28,7 +28,7 @@ import {
   getProviderDisplayName,
 } from "../lib/data";
 import { getAskResponse, isAskAvailable } from "../lib/ask";
-import { createSupabaseEventStore, resolveOutcomes } from "@p360/core";
+import { createSupabaseEventStore, createSupabaseProfileStore, resolveOutcomes } from "@p360/core";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
 
@@ -268,3 +268,111 @@ export async function handleUnknown(ctx: Context) {
   );
 }
 
+// /profile command - show causality learning progress + active personal constants
+export async function handleProfile(ctx: Context) {
+  const telegramId = ctx.from?.id;
+  if (!telegramId) return;
+
+  if (!hasConnectedDevice(telegramId)) {
+    await reply(ctx, MESSAGES.notConnected);
+    return;
+  }
+
+  await ctx.reply("🔄 Loading your profile...");
+
+  const userId = `tg-${telegramId}`;
+  const MIN_FOR_PATTERN = 5;
+
+  try {
+    const profileStore = createSupabaseProfileStore();
+    if (!profileStore || !eventStore) {
+      await reply(ctx, "⚠️ Profile not available (Supabase not configured).");
+      return;
+    }
+
+    const [profile, events] = await Promise.all([
+      profileStore.getProfile(userId),
+      eventStore.getByUser(userId, 200),
+    ]);
+
+    // Count useful events per domain (amount > 0 + outcome = eligible for pattern detection)
+    const domainProgress: Record<string, { useful: number }> = {
+      drink: { useful: 0 },
+      coffee: { useful: 0 },
+      workout: { useful: 0 },
+    };
+
+    for (const event of events) {
+      const d = domainProgress[event.domain];
+      if (!d) continue;
+      if (event.outcome && event.action.amount !== undefined && event.action.amount > 0) {
+        d.useful++;
+      }
+    }
+
+    const totalEvents = events.filter((e) => e.domain !== "general").length;
+    const totalWithOutcome = events.filter((e) => e.outcome).length;
+    const lines: string[] = [];
+
+    lines.push(`<b>📊 Your Causality Profile</b>`);
+    lines.push(``);
+    lines.push(`Events tracked: <b>${totalEvents}</b> | With outcome: <b>${totalWithOutcome}</b>`);
+    lines.push(``);
+
+    const constants = profile?.personalConstants ?? {};
+    const hasConstants = Object.keys(constants).length > 0;
+
+    if (hasConstants) {
+      lines.push(`<b>⚙️ Your Personal Constants</b>`);
+      lines.push(`<i>(Claude uses these instead of population averages)</i>`);
+      lines.push(``);
+      if (constants.alcoholHrvDropPerDrink !== undefined)
+        lines.push(`  🍺 HRV drop/drink: <b>${constants.alcoholHrvDropPerDrink.toFixed(1)}%</b>  <i>avg: 4.5%</i>`);
+      if (constants.alcoholRecoveryDropPerDrink !== undefined)
+        lines.push(`  🍺 Recovery cost/drink: <b>${constants.alcoholRecoveryDropPerDrink.toFixed(1)} pts</b>  <i>avg: 4.2</i>`);
+      if (constants.personalDrinkLimit !== undefined)
+        lines.push(`  🍺 Safe drink limit: <b>${constants.personalDrinkLimit}</b>  <i>avg: 3</i>`);
+      if (constants.caffeineSleepImpactPerCup !== undefined)
+        lines.push(`  ☕ Sleep impact/cup: <b>${constants.caffeineSleepImpactPerCup.toFixed(1)} pts</b>  <i>avg: 4</i>`);
+      if (constants.caffeineHalfLifeHours !== undefined)
+        lines.push(`  ☕ Caffeine half-life: <b>${constants.caffeineHalfLifeHours}h</b>  <i>avg: 6h</i>`);
+      if (constants.workoutRecoveryThreshold !== undefined)
+        lines.push(`  💪 Workout threshold: <b>${constants.workoutRecoveryThreshold}</b>  <i>avg: 70</i>`);
+
+      if (profile?.patterns && profile.patterns.length > 0) {
+        lines.push(``);
+        lines.push(`<b>🔍 Discovered Patterns</b>`);
+        profile.patterns.slice(0, 3).forEach((p) => {
+          lines.push(`  • ${p.description}`);
+        });
+      }
+      lines.push(``);
+    } else {
+      lines.push(`<b>⚙️ Personal constants:</b> not yet unlocked`);
+      lines.push(`<i>Using population defaults for now</i>`);
+      lines.push(``);
+    }
+
+    // Progress bars for unlocking patterns
+    const domainEmoji: Record<string, string> = { drink: "🍺", coffee: "☕", workout: "💪" };
+    const progressLines: string[] = [];
+    for (const [domain, { useful }] of Object.entries(domainProgress)) {
+      const emoji = domainEmoji[domain];
+      if (useful >= MIN_FOR_PATTERN) {
+        progressLines.push(`  ${emoji} ${domain}: ✅ unlocked (${useful} data points)`);
+      } else {
+        progressLines.push(`  ${emoji} ${domain}: ${useful}/${MIN_FOR_PATTERN}  ← ${MIN_FOR_PATTERN - useful} more needed`);
+      }
+    }
+
+    lines.push(`<b>📈 Progress to personalization</b>`);
+    lines.push(progressLines.join("\n"));
+    lines.push(``);
+    lines.push(`<i>Keep using /ask. Patterns unlock automatically once thresholds are hit.</i>`);
+
+    await reply(ctx, lines.join("\n"));
+  } catch (error) {
+    console.error("profile error:", error);
+    await reply(ctx, "❌ Error loading profile. Try again.");
+  }
+}

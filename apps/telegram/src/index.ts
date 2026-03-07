@@ -17,6 +17,7 @@ import {
   handleAsk,
   handleDemo,
   handleTimezone,
+  handleProfile,
   handleUnknown,
 } from "./bot/handlers";
 import { getConnectedUsers, preloadUsers } from "./lib/storage";
@@ -59,6 +60,7 @@ bot.command("connect", handleConnect);
 bot.command("status", handleStatus);
 bot.command("disconnect", handleDisconnect);
 bot.command("timezone", handleTimezone);
+bot.command("profile", handleProfile);
 
 // Handle unknown commands
 bot.on("message:text", (ctx) => {
