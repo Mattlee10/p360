@@ -341,11 +341,13 @@ export function extractEventFromAsk(
       ? "workout"
       : domain;
 
-  // If domain resolved to "drink" but substance is food, reclassify to "meal"
+  // If domain resolved to "drink" but substance is food/coffee/tea, reclassify
   if (resolvedDomain === "drink") {
     const substance = extractSubstance(question);
     if (substance && FOOD_SUBSTANCES.has(substance)) {
       resolvedDomain = "meal";
+    } else if (substance === "coffee" || substance === "tea") {
+      resolvedDomain = "coffee";
     }
   }
 
