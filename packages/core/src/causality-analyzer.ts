@@ -19,7 +19,7 @@ import type {
 // Constants
 // ============================================
 
-const MIN_EVENTS_FOR_PATTERN = 5;
+const MIN_EVENTS_FOR_PATTERN = 3;
 const MIN_EVENTS_FOR_HIGH_CONFIDENCE = 15;
 
 // Population defaults (현재 cost.ts, drink.ts의 static constants)
@@ -230,7 +230,8 @@ export function analyzeCaffeineTimingImpact(
 ): PersonalPattern | null {
   const valid = events.filter(
     (e) =>
-      e.domain === "coffee" &&
+      // coffee domain + drink domain에서 coffee/tea detail 모두 포함
+      (e.domain === "coffee" || (e.domain === "drink" && (e.action.detail === "coffee" || e.action.detail === "tea"))) &&
       e.action.times !== undefined &&
       e.action.times.length > 0 &&
       e.outcome !== undefined &&
