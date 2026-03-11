@@ -218,6 +218,64 @@ export function analyzeCaffeineSensitivity(
 }
 
 /**
+ * 개인 카페인 타이밍 분석 (amount 없어도 동작)
+ *
+ * Input: coffee 이벤트의 마지막 음용 시간(times[]) + outcome의 sleep delta
+ * Output: 수면에 영향을 주기 시작하는 커피 시간 (cutoff)
+ *
+ * 예: cutoff=13.5 → "오후 1:30 이후 커피는 수면 -X점"
+ */
+export function analyzeCaffeineTimingImpact(
+  events: CausalityEvent[],
+): PersonalPattern | null {
+  const valid = events.filter(
+    (e) =>
+      e.domain === "coffee" &&
+      e.action.times !== undefined &&
+      e.action.times.length > 0 &&
+      e.outcome !== undefined &&
+      e.outcome.delta.sleepChange !== null,
+  );
+
+  if (valid.length < MIN_EVENTS_FOR_PATTERN) return null;
+
+  // 마지막 커피 시간을 소수점 시간으로 변환 (예: 15:30 → 15.5)
+  const x = valid.map((e) => {
+    const times = e.action.times!;
+    const lastTime = times[times.length - 1];
+    const [h, m] = lastTime.split(":").map(Number);
+    return h + m / 60;
+  });
+  const y = valid.map((e) => e.outcome!.delta.sleepChange!);
+
+  const result = linearRegression(x, y);
+  if (!result) return null;
+
+  // y = 0 지점 = 수면 영향 없는 마지막 시간 (cutoff)
+  let cutoffHour = 14; // population default: 오후 2시
+  if (result.slope !== 0) {
+    const crossover = -result.intercept / result.slope;
+    if (crossover >= 8 && crossover <= 22) {
+      cutoffHour = Math.round(crossover * 2) / 2; // 30분 단위
+    }
+  }
+
+  const cutoffFormatted = `${Math.floor(cutoffHour)}:${cutoffHour % 1 === 0.5 ? "30" : "00"}`;
+
+  return {
+    userId: valid[0].userId,
+    domain: "coffee",
+    patternType: "caffeine_timing_cutoff",
+    learnedValue: cutoffHour,
+    populationDefault: 14,
+    confidence: calculateConfidence(valid.length, result.r2),
+    dataPoints: valid.length,
+    lastUpdated: new Date(),
+    description: `Your coffee cutoff: ${cutoffFormatted} (later → worse sleep, slope=${result.slope.toFixed(2)})`,
+  };
+}
+
+/**
  * 개인 운동 회복 분석
  *
  * workout 이벤트가 있는 날 vs 없는 날의 다음날 readiness 비교
@@ -378,6 +436,12 @@ export function buildCausalityProfile(
   if (caffeine) {
     patterns.push(caffeine);
     constants.caffeineSleepImpactPerCup = caffeine.learnedValue;
+  }
+
+  const caffeineTiming = analyzeCaffeineTimingImpact(events);
+  if (caffeineTiming) {
+    patterns.push(caffeineTiming);
+    constants.caffeineTimingCutoff = caffeineTiming.learnedValue;
   }
 
   const workout = analyzeWorkoutRecovery(events);

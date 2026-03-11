@@ -113,6 +113,7 @@ export interface PersonalConstants {
   // Caffeine
   caffeineSleepImpactPerCup?: number;     // default: 4
   caffeineHalfLifeHours?: number;         // default: 6
+  caffeineTimingCutoff?: number;          // default: 14 (오후 2시), learned: 이 시간 이후 커피 = 수면 영향
 
   // Workout
   workoutRecoveryThreshold?: number;      // default: 70

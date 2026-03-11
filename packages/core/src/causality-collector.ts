@@ -437,13 +437,8 @@ function buildAction(
     }
 
     default: {
-      // general 도메인도 저장 — raw question이 causality 단서
-      const times = extractTimes(question);
-      return {
-        type: "asked",
-        detail: question.slice(0, 200),
-        ...(times ? { times, timezone } : {}),
-      };
+      // general 도메인은 causality 분석에 불필요 — null 반환
+      return null;
     }
   }
 }
@@ -482,7 +477,10 @@ function extractRecommendation(
 
 /**
  * 매일 바이오 데이터 fetch할 때 호출
- * 어제의 이벤트에 오늘 바이오 데이터를 outcome으로 연결
+ * 각 pending event에 대해 "event 날짜 + 1일"의 바이오 데이터를 outcome으로 연결
+ *
+ * history가 있으면 날짜별 정확한 데이터 lookup (delta=0 방지)
+ * history 없으면 todayBiometrics fallback
  *
  * @returns 해결된 이벤트 수
  */
@@ -495,10 +493,35 @@ export async function resolveOutcomes(
 
   if (pending.length === 0) return 0;
 
-  const afterSnapshot: BiometricSnapshot = toBiometricSnapshot(todayBiometrics);
+  const history = todayBiometrics.history;
   let resolved = 0;
 
   for (const event of pending) {
+    // event 발생 다음날 날짜 계산 (UTC 기준)
+    const eventDateStr = event.timestamp.toISOString().split("T")[0];
+    const nextDate = new Date(eventDateStr + "T00:00:00Z");
+    nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+    const nextDateStr = nextDate.toISOString().split("T")[0];
+
+    let afterSnapshot: BiometricSnapshot;
+
+    if (history && history.dates.length > 0) {
+      const idx = history.dates.indexOf(nextDateStr);
+      if (idx === -1) {
+        // 다음날 데이터 아직 없음 — Oura 미업데이트, skip
+        continue;
+      }
+      afterSnapshot = {
+        sleepScore: history.sleepValues[idx] || null,
+        readinessScore: history.readinessValues[idx] || null,
+        hrvBalance: history.hrvValues[idx] || null,
+        restingHR: null, // BiometricHistory에 RHR 미포함
+      };
+    } else {
+      // history 없으면 todayBiometrics fallback
+      afterSnapshot = toBiometricSnapshot(todayBiometrics);
+    }
+
     const delta = calculateDelta(event.biometricsBefore, afterSnapshot);
 
     const outcome: CausalityOutcome = {
