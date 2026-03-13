@@ -318,8 +318,9 @@ function calculateCaffeineCost(
 
   const totalRecoveryDays = timeline.length > 0 && sleepImpact >= 4 ? 1 : 0;
 
-  // Cutoff time calculation
-  const cutoffHour = 22 - Math.ceil(CAFFEINE_HALF_LIFE_HOURS * 2); // 2 half-lives = 25% remaining
+  // Cutoff time calculation (use personal cutoff if learned, else derive from half-life)
+  const cutoffHour = profile?.personalConstants.caffeineTimingCutoff
+    ?? (22 - Math.ceil(halfLifeHours * 2));
   const cutoffTime =
     cutoffHour <= 12 ? `${cutoffHour}am` : `${cutoffHour - 12}pm`;
 

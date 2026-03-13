@@ -491,6 +491,11 @@ export function buildSystemPrompt(
       lines.push(`- Caffeine sleep impact: ${c.caffeineSleepImpactPerCup}pts/cup (population: 4)`);
     if (c.caffeineHalfLifeHours !== undefined)
       lines.push(`- Caffeine half-life: ${c.caffeineHalfLifeHours}h (population: 6h)`);
+    if (c.caffeineTimingCutoff !== undefined) {
+      const h = Math.floor(c.caffeineTimingCutoff);
+      const m = c.caffeineTimingCutoff % 1 === 0.5 ? "30" : "00";
+      lines.push(`- Coffee cutoff: ${h}:${m} (population: 14:00) — coffee after this time degrades sleep`);
+    }
 
     if (profile.patterns.length > 0) {
       profile.patterns.forEach((p) => lines.push(`- ${p.description}`));
