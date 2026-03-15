@@ -28,7 +28,7 @@ import {
   getProviderDisplayName,
 } from "../lib/data";
 import { getAskResponse, isAskAvailable } from "../lib/ask";
-import { createSupabaseEventStore, createSupabaseProfileStore, resolveOutcomes } from "@p360/core";
+import { createSupabaseEventStore, createSupabaseProfileStore, resolveOutcomes, buildCausalityProfile } from "@p360/core";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
 
@@ -92,10 +92,19 @@ async function routeThroughAsk(
     const message = await getAskResponse(question, data, userId, eventStore, undefined, userTimezone);
     updateLastCheck(telegramId);
 
-    // Resolve yesterday's pending outcomes (fire-and-forget)
-    // 토큰이 살아있는 지금 처리 — cron 의존 없음
+    // Resolve yesterday's pending outcomes → profile 자동 갱신 (fire-and-forget)
     if (eventStore && !demo) {
-      resolveOutcomes(eventStore, userId, data).catch(() => {});
+      resolveOutcomes(eventStore, userId, data).then(async (resolved) => {
+        if (resolved > 0) {
+          const profileStore = createSupabaseProfileStore();
+          if (profileStore) {
+            const allEvents = await eventStore.getByUser(userId, 500);
+            const newProfile = buildCausalityProfile(userId, allEvents);
+            await profileStore.saveProfile(newProfile);
+            console.log(`[profile] Updated for ${userId}: ${resolved} outcomes resolved, ${newProfile.patterns.length} patterns`);
+          }
+        }
+      }).catch(() => {});
     }
 
     const demoNote = demo
@@ -305,7 +314,11 @@ export async function handleProfile(ctx: Context) {
     for (const event of events) {
       const d = domainProgress[event.domain];
       if (!d) continue;
-      if (event.outcome && event.action.amount !== undefined && event.action.amount > 0) {
+      const hasAmount = event.action.amount !== undefined && event.action.amount > 0;
+      const hasTimes = event.action.times !== undefined && event.action.times.length > 0;
+      const isCoffeeEligible = event.domain === "coffee" && (hasAmount || hasTimes);
+      const isOtherEligible = event.domain !== "coffee" && hasAmount;
+      if (event.outcome && (isCoffeeEligible || isOtherEligible)) {
         d.useful++;
       }
     }

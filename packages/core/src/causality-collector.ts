@@ -220,6 +220,10 @@ const SUBSTANCE_KEYWORDS: Record<string, string> = {
   보충제: "supplement", supplement: "supplement",
 };
 
+const KOREAN_NUMERALS: Record<string, number> = {
+  한: 1, 두: 2, 세: 3, 네: 4, 다섯: 5, 여섯: 6, 일곱: 7, 여덟: 8, 아홉: 9, 열: 10,
+};
+
 function extractAmount(question: string): number | undefined {
   for (const pattern of AMOUNT_PATTERNS) {
     const match = question.match(pattern);
@@ -227,6 +231,11 @@ function extractAmount(question: string): number | undefined {
       const num = parseInt(match[1], 10);
       if (num >= 1 && num <= 20) return num;
     }
+  }
+  // 한국어 수관형사: "한잔", "두 잔", "세 잔"
+  const koreanMatch = question.match(/(한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*(?:잔|병|컵|cup)/);
+  if (koreanMatch) {
+    return KOREAN_NUMERALS[koreanMatch[1]];
   }
   return undefined;
 }
