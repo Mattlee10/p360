@@ -228,15 +228,17 @@ export function analyzeCaffeineSensitivity(
 export function analyzeCaffeineTimingImpact(
   events: CausalityEvent[],
 ): PersonalPattern | null {
-  const valid = events.filter(
-    (e) =>
-      // coffee domain + drink domain에서 coffee/tea detail 모두 포함
-      (e.domain === "coffee" || (e.domain === "drink" && (e.action.detail === "coffee" || e.action.detail === "tea"))) &&
-      e.action.times !== undefined &&
-      e.action.times.length > 0 &&
-      e.outcome !== undefined &&
-      e.outcome.delta.sleepChange !== null,
-  );
+  const valid = events.filter((e) => {
+    // coffee/tea detail만 포함 (noodle 등 음식 이벤트 제외)
+    if (!(e.domain === "coffee" || e.domain === "drink")) return false;
+    if (!(e.action.detail === "coffee" || e.action.detail === "tea")) return false;
+    if (!e.action.times?.length) return false;
+    if (!e.outcome || e.outcome.delta.sleepChange === null) return false;
+    // 오전 7시 이전 커피는 타이밍 분석에서 제외 (새벽 입력 노이즈)
+    const lastTime = e.action.times[e.action.times.length - 1];
+    const lastHour = parseInt(lastTime.split(":")[0], 10);
+    return lastHour >= 7;
+  });
 
   if (valid.length < MIN_EVENTS_FOR_PATTERN) return null;
 
