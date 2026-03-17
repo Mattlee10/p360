@@ -349,6 +349,13 @@ export async function handleProfile(ctx: Context) {
         lines.push(`  ☕ Sleep impact/cup: <b>${constants.caffeineSleepImpactPerCup.toFixed(1)} pts</b>  <i>avg: 4</i>`);
       if (constants.caffeineHalfLifeHours !== undefined)
         lines.push(`  ☕ Caffeine half-life: <b>${constants.caffeineHalfLifeHours}h</b>  <i>avg: 6h</i>`);
+      if (constants.caffeineTimingCutoff !== undefined) {
+        const h = Math.floor(constants.caffeineTimingCutoff);
+        const m = constants.caffeineTimingCutoff % 1 === 0.5 ? "30" : "00";
+        const ampm = h < 12 ? "AM" : "PM";
+        const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+        lines.push(`  ☕ Coffee cutoff: <b>${h}:${m}</b> (${h12}:${m} ${ampm})  <i>avg: 14:00 (2:00 PM)</i>`);
+      }
       if (constants.workoutRecoveryThreshold !== undefined)
         lines.push(`  💪 Workout threshold: <b>${constants.workoutRecoveryThreshold}</b>  <i>avg: 70</i>`);
 

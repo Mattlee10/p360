@@ -494,7 +494,9 @@ export function buildSystemPrompt(
     if (c.caffeineTimingCutoff !== undefined) {
       const h = Math.floor(c.caffeineTimingCutoff);
       const m = c.caffeineTimingCutoff % 1 === 0.5 ? "30" : "00";
-      lines.push(`- Coffee cutoff: ${h}:${m} (population: 14:00) — coffee after this time degrades sleep`);
+      const ampm = h < 12 ? "AM" : "PM";
+      const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      lines.push(`- Coffee cutoff: ${h}:${m} in 24h format (= ${h12}:${m} ${ampm}) — coffee after this time degrades sleep; population default: 14:00 (2:00 PM)`);
     }
 
     if (profile.patterns.length > 0) {
