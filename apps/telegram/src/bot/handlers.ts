@@ -324,7 +324,7 @@ export async function handleProfile(ctx: Context) {
     }
 
     const totalEvents = events.filter((e) => e.domain !== "general").length;
-    const totalWithOutcome = events.filter((e) => e.outcome).length;
+    const totalWithOutcome = events.filter((e) => e.domain !== "general" && e.outcome).length;
     const lines: string[] = [];
 
     lines.push(`<b>📊 Your Causality Profile</b>`);
