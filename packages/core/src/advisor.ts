@@ -456,12 +456,27 @@ function formatBiometrics(data: BiometricData): string {
     : hrvDiff < -10 ? `${hrvDiff}% below baseline`
     : "at baseline";
 
-  return [
+  const lines = [
     `Sleep: ${sleep}/100 (${sleepStatus})`,
     `Readiness: ${readiness}/100 (${readinessStatus})`,
     `HRV balance: ${data.hrvBalance ?? "N/A"} (${hrvTrend})`,
     `Date: ${data.date}`,
-  ].join("\n");
+  ];
+
+  if (data.deepSleepMinutes != null) {
+    lines.push(`Deep sleep: ${data.deepSleepMinutes} min`);
+  }
+  if (data.bedtimeHour != null) {
+    const rawH = data.bedtimeHour;
+    const displayH = rawH >= 24 ? rawH - 24 : rawH;
+    const h = Math.floor(displayH);
+    const m = displayH % 1 === 0.5 ? "30" : "00";
+    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    const ampm = h >= 12 && h < 24 ? "PM" : "AM";
+    lines.push(`Bedtime last night: ${h}:${m} (${h12}:${m} ${ampm})`);
+  }
+
+  return lines.join("\n");
 }
 
 export function buildSystemPrompt(
