@@ -498,6 +498,16 @@ export function buildSystemPrompt(
       const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
       lines.push(`- Coffee cutoff: ${h}:${m} in 24h format (= ${h12}:${m} ${ampm}) — coffee after this time degrades sleep; population default: 14:00 (2:00 PM)`);
     }
+    if (c.optimalBedtimeHour !== undefined) {
+      const rawH = c.optimalBedtimeHour;
+      const displayH = rawH >= 24 ? rawH - 24 : rawH;
+      const h = Math.floor(displayH);
+      const m = displayH % 1 === 0.5 ? "30" : "00";
+      const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      const ampm = h >= 12 && h < 24 ? "PM" : "AM";
+      const suffix = rawH >= 24 ? " (next-day AM)" : "";
+      lines.push(`- Optimal bedtime: ${h}:${m} (${h12}:${m} ${ampm}${suffix}) — going to bed later than this reduces deep sleep; population default: 23:00 (11:00 PM)`);
+    }
 
     if (profile.patterns.length > 0) {
       profile.patterns.forEach((p) => lines.push(`- ${p.description}`));

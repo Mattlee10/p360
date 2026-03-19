@@ -117,7 +117,7 @@ function scheduleCronJobs() {
             const events = await eventStore.getByUser(userId, 100);
             if (events.length >= 5) {
               try {
-                const profile = buildCausalityProfile(userId, events);
+                const profile = buildCausalityProfile(userId, events, userData.history);
                 await profileStore.saveProfile(profile);
                 console.log(`[cron] ✅ Profile updated for ${userId} (${events.length} events)`);
               } catch (err) {

@@ -11,6 +11,9 @@ export interface BiometricData {
   // Optional: baseline comparison
   hrvBaseline?: number | null;
   sleepBaseline?: number | null;
+  // Sleep detail (from Oura sleep sessions)
+  bedtimeHour?: number | null;      // local hour, e.g. 23.5 = 11:30 PM, 24.5 = 0:30 AM next day
+  deepSleepMinutes?: number | null; // actual deep sleep in minutes
   // Optional: 60-day historical arrays for signal/noise analysis
   history?: BiometricHistory;
 }
@@ -20,6 +23,9 @@ export interface BiometricHistory {
   readinessValues: number[]; // 60-day readiness scores
   sleepValues: number[];     // 60-day sleep scores
   dates: string[];           // Corresponding dates
+  // Sleep detail (optional — populated when sleep sessions API is available)
+  bedtimeHours?: (number | null)[];      // local bedtime hour per date (24+= next-day AM)
+  deepSleepMinutes?: (number | null)[];  // deep sleep duration per date in minutes
 }
 
 // ============================================

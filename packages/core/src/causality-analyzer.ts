@@ -14,6 +14,7 @@ import type {
   PersonalConstants,
   CausalityProfile,
 } from "./causality";
+import type { BiometricHistory } from "./types";
 
 // ============================================
 // Constants
@@ -383,6 +384,82 @@ export function analyzePersonalDrinkLimit(
   };
 }
 
+/**
+ * 취침 시간 → deep sleep 영향 분석 (history 기반, event 파이프라인 불필요)
+ *
+ * Input:  BiometricHistory.bedtimeHours + deepSleepMinutes (60일 배열)
+ * Output: 이 유저의 최적 취침 시간 (deep sleep 최대화 지점)
+ *
+ * 로직:
+ *   - 취침 시간(X) vs deep sleep 분(Y) 선형 회귀
+ *   - slope가 음수면 늦게 잘수록 deep sleep 감소 (예상 패턴)
+ *   - 회귀선이 유저 평균 deep sleep을 유지하는 마지막 시간 = 최적 취침 시간
+ */
+export function analyzeBedtimeImpact(
+  userId: string,
+  history: BiometricHistory,
+): PersonalPattern | null {
+  if (!history.bedtimeHours || !history.deepSleepMinutes) return null;
+
+  // (bedtimeHour, deepSleepMinutes) 쌍 중 유효한 것만
+  const pairs: { bedtime: number; deepSleep: number }[] = [];
+  for (let i = 0; i < history.bedtimeHours.length; i++) {
+    const bedtime = history.bedtimeHours[i];
+    const deepSleep = history.deepSleepMinutes[i];
+    if (
+      bedtime !== null &&
+      bedtime >= 18 &&   // 6 PM 이후만 (낮잠 제외)
+      bedtime <= 28 &&   // 4 AM 이전만 (24+는 다음날 새벽)
+      deepSleep !== null &&
+      deepSleep > 0
+    ) {
+      pairs.push({ bedtime, deepSleep });
+    }
+  }
+
+  if (pairs.length < MIN_EVENTS_FOR_PATTERN) return null;
+
+  const x = pairs.map((p) => p.bedtime);
+  const y = pairs.map((p) => p.deepSleep);
+
+  const result = linearRegression(x, y);
+  if (!result) return null;
+
+  // 최적 취침 시간: 회귀선이 유저 평균 deep sleep을 교차하는 지점
+  // y = slope * x + intercept, y = meanDeepSleep → x = (mean - intercept) / slope
+  const meanDeepSleep = y.reduce((a, b) => a + b, 0) / y.length;
+  const POPULATION_BEDTIME_DEFAULT = 23; // population default: 11 PM
+
+  let optimalHour = POPULATION_BEDTIME_DEFAULT;
+  if (result.slope < 0 && result.slope !== 0) {
+    // 음수 기울기: 늦게 잘수록 deep sleep 감소 (정상 패턴)
+    const crossover = (meanDeepSleep - result.intercept) / result.slope;
+    if (crossover >= 20 && crossover <= 26) {
+      optimalHour = Math.round(crossover * 2) / 2; // 30분 단위 반올림
+    }
+  }
+
+  // 표시용 포맷 (24h+ 정규화)
+  const displayHour = optimalHour >= 24 ? optimalHour - 24 : optimalHour;
+  const h = Math.floor(displayHour);
+  const m = displayHour % 1 === 0.5 ? "30" : "00";
+  const suffix = optimalHour >= 24 ? " (next day AM)" : "";
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  const ampm = h >= 12 && h < 24 ? "PM" : "AM";
+
+  return {
+    userId,
+    domain: "sleep",
+    patternType: "optimal_bedtime",
+    learnedValue: optimalHour,
+    populationDefault: POPULATION_BEDTIME_DEFAULT,
+    confidence: calculateConfidence(pairs.length, result.r2),
+    dataPoints: pairs.length,
+    lastUpdated: new Date(),
+    description: `Optimal bedtime: ${h}:${m} (${h12}:${m} ${ampm}${suffix}) — ${Math.abs(result.slope).toFixed(1)} min deep sleep lost per hour later (${pairs.length} nights)`,
+  };
+}
+
 // ============================================
 // Confidence Calculation
 // ============================================
@@ -405,13 +482,15 @@ function calculateConfidence(dataPoints: number, r2: number): number {
 // ============================================
 
 /**
- * 축적된 이벤트에서 전체 CausalityProfile 생성
+ * 축적된 이벤트 + 바이오 히스토리에서 전체 CausalityProfile 생성
  *
- * 이 프로필의 personalConstants가 cost.ts, drink.ts 등에 주입됨
+ * history를 넘기면 취침 시간 → deep sleep 패턴도 포함됨 (event 파이프라인 불필요)
+ * 이 프로필의 personalConstants가 advisor.ts 시스템 프롬프트에 주입됨
  */
 export function buildCausalityProfile(
   userId: string,
   events: CausalityEvent[],
+  history?: BiometricHistory,
 ): CausalityProfile {
   const patterns: PersonalPattern[] = [];
   const constants: PersonalConstants = {};
@@ -451,6 +530,15 @@ export function buildCausalityProfile(
   if (workout) {
     patterns.push(workout);
     constants.workoutRecoveryThreshold = workout.learnedValue;
+  }
+
+  // History-based analysis (no event pipeline needed)
+  if (history) {
+    const bedtime = analyzeBedtimeImpact(userId, history);
+    if (bedtime) {
+      patterns.push(bedtime);
+      constants.optimalBedtimeHour = bedtime.learnedValue;
+    }
   }
 
   // 이벤트 메타데이터

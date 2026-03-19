@@ -59,3 +59,13 @@ export interface OuraDailyActivity {
 export interface OuraActivityData {
   data: OuraDailyActivity[];
 }
+
+export interface OuraSleepSession {
+  id: string;
+  day: string;
+  type: string;           // "long_sleep" | "short_sleep" | "rest" | "nap"
+  bedtime_start: string;  // ISO 8601 with timezone, e.g. "2024-01-01T23:30:00+09:00"
+  bedtime_end: string;
+  deep_sleep_duration: number | null;  // seconds
+  total_sleep_duration: number | null; // seconds
+}

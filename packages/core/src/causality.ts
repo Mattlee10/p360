@@ -117,6 +117,9 @@ export interface PersonalConstants {
 
   // Workout
   workoutRecoveryThreshold?: number;      // default: 70
+
+  // Sleep
+  optimalBedtimeHour?: number;           // e.g. 22.5 = 10:30 PM — bedtime at/before this maximizes deep sleep
 }
 
 export interface CausalityProfile {

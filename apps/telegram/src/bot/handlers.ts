@@ -99,7 +99,7 @@ async function routeThroughAsk(
           const profileStore = createSupabaseProfileStore();
           if (profileStore) {
             const allEvents = await eventStore.getByUser(userId, 500);
-            const newProfile = buildCausalityProfile(userId, allEvents);
+            const newProfile = buildCausalityProfile(userId, allEvents, data.history);
             await profileStore.saveProfile(newProfile);
             console.log(`[profile] Updated for ${userId}: ${resolved} outcomes resolved, ${newProfile.patterns.length} patterns`);
           }
