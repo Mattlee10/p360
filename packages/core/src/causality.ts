@@ -66,6 +66,7 @@ export interface BiometricSnapshot {
   readinessScore: number | null;
   hrvBalance: number | null;
   restingHR: number | null;
+  deepSleepMinutes: number | null;
 }
 
 export interface CausalityOutcome {
@@ -78,6 +79,7 @@ export interface CausalityOutcome {
     readinessChange: number | null;
     hrvChange: number | null;       // percentage point change
     rhrChange: number | null;
+    deepSleepChange: number | null; // minutes
   };
 }
 
@@ -154,6 +156,7 @@ export function toBiometricSnapshot(data: BiometricData): BiometricSnapshot {
     readinessScore: data.readinessScore,
     hrvBalance: data.hrvBalance,
     restingHR: data.restingHR,
+    deepSleepMinutes: data.deepSleepMinutes ?? null,
   };
 }
 
@@ -177,6 +180,9 @@ export function calculateDelta(
       : null,
     rhrChange: before.restingHR !== null && after.restingHR !== null
       ? after.restingHR - before.restingHR
+      : null,
+    deepSleepChange: before.deepSleepMinutes !== null && after.deepSleepMinutes !== null
+      ? after.deepSleepMinutes - before.deepSleepMinutes
       : null,
   };
 }

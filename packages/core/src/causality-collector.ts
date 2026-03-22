@@ -557,6 +557,7 @@ export async function resolveOutcomes(
         readinessScore: history.readinessValues[idx] || null,
         hrvBalance: history.hrvValues[idx] || null,
         restingHR: null, // BiometricHistory에 RHR 미포함
+        deepSleepMinutes: history.deepSleepMinutes?.[idx] ?? null,
       };
     } else {
       // history 없으면 todayBiometrics fallback
