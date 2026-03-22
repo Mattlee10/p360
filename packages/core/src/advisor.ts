@@ -97,6 +97,14 @@ const ROUTES: RouteMatch[] = [
     ],
   },
   {
+    key: "sleep",
+    keywords: [
+      "sleep", "자려고", "잘 예정", "잘거야", "잠", "수면", "자기 전", "취침",
+      "deep sleep", "딥슬립", "rem sleep", "bedtime", "취침 시간", "잘 것 같",
+      "몇 시간 잘", "시간 잘", "일찍 자", "늦게 자", "잠들", "잠자리",
+    ],
+  },
+  {
     key: "meal",
     keywords: [
       // 한국어 음식/식사/보충제
@@ -419,6 +427,40 @@ function minimalAnalysis(
         break;
       }
 
+      case "sleep": {
+        const h = data.history;
+        const current = {
+          deepSleepMinutes: data.deepSleepMinutes ?? null,
+          bedtimeHour: data.bedtimeHour ?? null,
+          sleepScore: data.sleepScore ?? null,
+        };
+
+        if (h && h.dates.length >= 7) {
+          const recentDeepSleep = (h.deepSleepMinutes ?? [])
+            .slice(-7)
+            .filter((v): v is number => v !== null);
+          const recentBedtimes = (h.bedtimeHours ?? [])
+            .slice(-7)
+            .filter((v): v is number => v !== null);
+
+          analyses.sleepContext = {
+            current,
+            trend7d: {
+              avgDeepSleep: recentDeepSleep.length > 0
+                ? Math.round(recentDeepSleep.reduce((a, b) => a + b, 0) / recentDeepSleep.length)
+                : null,
+              avgBedtime: recentBedtimes.length > 0
+                ? Math.round(recentBedtimes.reduce((a, b) => a + b, 0) / recentBedtimes.length * 10) / 10
+                : null,
+              dataPoints: recentDeepSleep.length,
+            },
+          };
+        } else {
+          analyses.sleepContext = { current };
+        }
+        break;
+      }
+
       // workout, tired, general → Claude handles directly from biometrics
       case "workout":
       case "tired":
@@ -588,6 +630,15 @@ COFFEE questions:
 - Use coffeeCosts data for sleep impact calculation
 - Factor in time of day (caffeine half-life ~6 hours)
 - Show cutoff time for tonight's sleep
+
+SLEEP questions:
+- Use sleepContext (if available): current deep sleep vs 7d average, last bedtime
+- When user states planned bedtime: compare to optimalBedtimeHour (if known) and show expected deep sleep delta
+- If optimalBedtimeHour is NOT known: state "still learning your pattern — logging this builds it"
+- Key insight: earlier bedtime (within circadian window) → more deep sleep. Show the tradeoff.
+- Format: "Planned: [time] → Expected deep sleep: ~[X] min (your 7d avg: [Y] min)"
+- Deep sleep targets: <60min = poor, 60-90min = fair, 90min+ = good
+- If user doesn't state bedtime, ask for it: "What time are you planning to sleep?"
 
 DRINK UNIT CONVERSION:
 When the user mentions drinks, convert to standard drinks for impact calculation.

@@ -286,6 +286,25 @@ function extractSport(question: string): string | undefined {
 }
 
 /**
+ * Extract planned sleep duration in hours from question text
+ * Examples: "7시간", "8 hours", "6.5시간"
+ */
+function extractSleepDurationHours(question: string): number | undefined {
+  const patterns = [
+    /(\d+(?:\.\d+)?)\s*시간/,
+    /(\d+(?:\.\d+)?)\s*hours?/i,
+  ];
+  for (const pattern of patterns) {
+    const match = question.match(pattern);
+    if (match) {
+      const num = parseFloat(match[1]);
+      if (num >= 3 && num <= 12) return num;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Extract exercise duration in minutes from question text
  * Examples: "40min walk", "walked for 30 minutes", "1 hour run"
  */
@@ -383,6 +402,7 @@ function mapRouteToDomain(route: string): CausalityDomain {
     workout: "workout",
     coffee: "coffee",
     meal: "meal",
+    sleep: "sleep",
     tired: "general",
     cost: "drink", // cost는 보통 drink 관련
   };
@@ -441,6 +461,18 @@ function buildAction(
         type: "ate",
         detail: substance ?? "meal",
         ...(amount !== undefined ? { amount } : {}),
+        ...(times ? { times, timezone } : {}),
+      };
+    }
+
+    case "sleep": {
+      const times = extractTimes(question);
+      const durationHours = extractSleepDurationHours(question);
+      // bedtime이나 duration 중 하나라도 있어야 저장 가치 있음
+      if (!times && durationHours === undefined) return null;
+      return {
+        type: "planned_sleep",
+        ...(durationHours !== undefined ? { amount: durationHours } : {}),
         ...(times ? { times, timezone } : {}),
       };
     }
