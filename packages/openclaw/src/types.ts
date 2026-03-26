@@ -10,12 +10,10 @@
 // ============================================
 
 export type PlatformType =
-  | "telegram"
   | "cli"
   | "discord"
   | "slack"
   | "web"
-  | "raycast"
   | "vscode"
   | "menubar"
   | "whatsapp";

@@ -155,7 +155,7 @@ export class ResponseFormatter {
     }
 
     return {
-      platform: "telegram",
+      platform: "web",
       native: lines.join("\n"),
     };
   }

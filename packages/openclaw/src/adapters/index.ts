@@ -8,20 +8,15 @@
 export { BaseAdapter } from "./types";
 export type {
   PlatformAdapter,
-  TelegramContext,
   DiscordInteraction,
   SlackEvent,
   SlackClient,
   WebRequest,
   CLIArgs,
-  RaycastListItem,
   VSCodeQuickPickItem,
   MenuBarItem,
   WhatsAppMessage,
 } from "./types";
-
-// Telegram Adapter
-export { TelegramAdapter, createTelegramAdapter } from "./telegram.adapter";
 
 // CLI Adapter
 export { CLIAdapter, createCLIAdapter } from "./cli.adapter";
