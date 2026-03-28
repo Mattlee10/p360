@@ -8,7 +8,7 @@
     "apps/telegram"
   ],
   "scripts": {
-    "install-all": "npm install && npm install --workspace=apps/telegram --workspace=apps/discord --workspace=packages/core",
+    "install-all": "npm install && npm install --workspace=apps/telegram --workspace=apps/discord --workspace=apps/whatsapp --workspace=packages/core",
     "dogfood": "node apps/cli/node_modules/typescript/bin/tsc --project scripts/tsconfig.json --typeRoots apps/cli/node_modules/@types 2>/dev/null; NODE_PATH=apps/cli/node_modules:packages/core/node_modules node .tmp/scripts/dogfood-analyze.js",
     "build": "npm run build --workspace=packages/core && npm run build --workspace=apps/telegram",
     "build-telegram": "cd apps/telegram && npm run build",
@@ -16,6 +16,8 @@
     "build-prod": "npm install --workspace=packages/core --workspace=apps/telegram && npm run build",
     "start": "cd apps/telegram && npm start",
     "start-telegram": "cd apps/telegram && npm start",
-    "start-discord": "cd apps/discord && npm start"
+    "start-discord": "cd apps/discord && npm start",
+    "build-whatsapp": "cd apps/whatsapp && npm run build",
+    "start-whatsapp": "cd apps/whatsapp && npm start"
   }
 }

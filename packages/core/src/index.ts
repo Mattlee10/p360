@@ -27,6 +27,7 @@ export type {
 export type { BiometricProvider, ProviderType } from "./providers/provider";
 export { OuraProvider } from "./providers/oura";
 export { WhoopProvider } from "./providers/whoop";
+export { AppleHealthProvider } from "./providers/apple-health";
 export type {
   WhoopRecovery,
   WhoopSleep,

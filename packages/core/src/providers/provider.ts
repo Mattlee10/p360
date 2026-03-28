@@ -28,4 +28,4 @@ export interface BiometricProvider {
   validateToken(token: string): Promise<boolean>;
 }
 
-export type ProviderType = "oura" | "whoop";
+export type ProviderType = "oura" | "whoop" | "apple-health";

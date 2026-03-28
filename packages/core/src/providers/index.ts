@@ -12,6 +12,9 @@ export type {
 
 // WHOOP provider
 export { WhoopProvider } from "./whoop";
+
+// Apple Health provider
+export { AppleHealthProvider } from "./apple-health";
 export type {
   WhoopRecovery,
   WhoopSleep,
