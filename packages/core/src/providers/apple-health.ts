@@ -68,12 +68,10 @@ export class AppleHealthProvider implements BiometricProvider {
     const supabase = getSupabaseClient();
     const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString().split("T")[0];
 
-    const { data, error } = await supabase
-      .from("apple_health_snapshots")
-      .select("*")
-      .eq("user_id", token)
-      .gte("date", sixtyDaysAgo)
-      .order("date", { ascending: true });
+    const { data, error } = await supabase.rpc("get_apple_health_snapshots", {
+      p_user_id: token,
+      p_since_date: sixtyDaysAgo,
+    });
 
     if (error) throw new Error(`Supabase error: ${error.message}`);
     if (!data || data.length === 0) throw new Error(`No Apple Health data found for user: ${token}`);
@@ -112,13 +110,13 @@ export class AppleHealthProvider implements BiometricProvider {
   async validateToken(token: string): Promise<boolean> {
     try {
       const supabase = getSupabaseClient();
-      const { data, error } = await supabase
-        .from("apple_health_snapshots")
-        .select("user_id")
-        .eq("user_id", token)
-        .limit(1);
+      const oneYearAgo = new Date(Date.now() - 365 * 86400000).toISOString().split("T")[0];
+      const { data, error } = await supabase.rpc("get_apple_health_snapshots", {
+        p_user_id: token,
+        p_since_date: oneYearAgo,
+      });
       if (error) return false;
-      return (data?.length ?? 0) > 0;
+      return Array.isArray(data) && data.length > 0;
     } catch {
       return false;
     }

@@ -13,14 +13,9 @@ function getSupabaseClient() {
  */
 export async function getUserIdByPhone(phone: string): Promise<string | null> {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("whatsapp_users")
-    .select("user_id")
-    .eq("wa_phone_number", phone)
-    .single();
-
+  const { data, error } = await supabase.rpc("get_whatsapp_user_id", { p_phone: phone });
   if (error || !data) return null;
-  return data.user_id as string;
+  return data as string;
 }
 
 /**
@@ -37,9 +32,16 @@ export async function upsertAppleHealthSnapshot(snapshot: {
   bedtime_hour?: number | null;
 }): Promise<void> {
   const supabase = getSupabaseClient();
-  const { error } = await supabase
-    .from("apple_health_snapshots")
-    .upsert(snapshot, { onConflict: "user_id,date" });
+  const { error } = await supabase.rpc("upsert_apple_health_snapshot", {
+    p_user_id: snapshot.user_id,
+    p_date: snapshot.date,
+    p_hrv_sdnn_ms: snapshot.hrv_sdnn_ms ?? null,
+    p_resting_hr: snapshot.resting_hr ?? null,
+    p_sleep_minutes: snapshot.sleep_minutes ?? null,
+    p_deep_sleep_minutes: snapshot.deep_sleep_minutes ?? null,
+    p_sleep_efficiency: snapshot.sleep_efficiency ?? null,
+    p_bedtime_hour: snapshot.bedtime_hour ?? null,
+  });
 
   if (error) throw new Error(`Supabase upsert error: ${error.message}`);
 }
