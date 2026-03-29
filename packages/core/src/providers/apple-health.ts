@@ -1,6 +1,6 @@
+import { Pool } from "pg";
 import { BiometricData, BiometricHistory } from "../types";
 import { BiometricProvider } from "./provider";
-import { createClient } from "@supabase/supabase-js";
 
 interface AppleHealthSnapshot {
   user_id: string;
@@ -14,36 +14,25 @@ interface AppleHealthSnapshot {
   created_at: string;
 }
 
-function getSupabaseClient() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required");
-  return createClient(url, key);
+let pool: Pool | null = null;
+
+function getPool(): Pool {
+  if (!pool) {
+    const url = process.env.DATABASE_URL;
+    if (!url) throw new Error("DATABASE_URL required");
+    pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } });
+  }
+  return pool;
 }
 
-/**
- * Normalize Apple Watch HRV (SDNN ms) to 0-100 scale.
- * SDNN and RMSSD differ numerically; SDNN is typically ~20% higher than RMSSD.
- * Using same formula as WHOOP (120ms → 100) adjusted for SDNN baseline.
- * sdnn / 1.2 gives: 72ms → 60 (baseline), 120ms → 100, 36ms → 30
- */
 function normalizeHrvSdnn(sdnn: number): number {
   return Math.min(100, Math.max(0, Math.round(sdnn / 1.2)));
 }
 
-/**
- * Normalize resting HR to 0-100 (lower HR = better).
- * Formula: (80 - rhr) / 40 * 100, clamped 0-100
- * 40bpm → 100, 60bpm → 50, 80bpm → 0
- */
 function normalizeRHR(rhr: number): number {
   return Math.min(100, Math.max(0, Math.round(((80 - rhr) / 40) * 100)));
 }
 
-/**
- * Normalize sleep to 0-100.
- * Prefer sleep_efficiency if available; else use minutes/480*100 (8hr = 100).
- */
 function normalizeSleep(sleepMinutes: number | null, sleepEfficiency: number | null): number | null {
   if (sleepEfficiency != null) return Math.min(100, Math.max(0, sleepEfficiency));
   if (sleepMinutes != null) return Math.min(100, Math.max(0, Math.round((sleepMinutes / 480) * 100)));
@@ -53,9 +42,8 @@ function normalizeSleep(sleepMinutes: number | null, sleepEfficiency: number | n
 /**
  * AppleHealthProvider
  *
- * Reads data from Supabase apple_health_snapshots table.
+ * Reads data from Supabase via direct pg connection (bypasses PostgREST).
  * The token is the user_id (e.g. "wa-61451024641").
- * Data is ingested via POST /health/apple on the whatsapp server.
  *
  * readinessScore formula:
  *   hrv_norm * 0.5 + rhr_norm * 0.3 + sleep_norm * 0.2
@@ -65,25 +53,24 @@ export class AppleHealthProvider implements BiometricProvider {
   readonly displayName = "Apple Watch";
 
   async fetchBiometricData(token: string): Promise<BiometricData> {
-    const supabase = getSupabaseClient();
     const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString().split("T")[0];
 
-    const { data, error } = await supabase.rpc("get_apple_health_snapshots", {
-      p_user_id: token,
-      p_since_date: sixtyDaysAgo,
-    });
+    const { rows } = await getPool().query<AppleHealthSnapshot>(
+      `SELECT user_id, date::text, hrv_sdnn_ms, resting_hr, sleep_minutes,
+              deep_sleep_minutes, sleep_efficiency, bedtime_hour, created_at
+       FROM public.apple_health_snapshots
+       WHERE user_id = $1 AND date >= $2
+       ORDER BY date ASC`,
+      [token, sixtyDaysAgo]
+    );
 
-    if (error) throw new Error(`Supabase error: ${error.message}`);
-    if (!data || data.length === 0) throw new Error(`No Apple Health data found for user: ${token}`);
+    if (rows.length === 0) throw new Error(`No Apple Health data found for user: ${token}`);
 
-    const snapshots = data as AppleHealthSnapshot[];
-    const latest = snapshots[snapshots.length - 1];
-
+    const latest = rows[rows.length - 1];
     const hrvNorm = latest.hrv_sdnn_ms != null ? normalizeHrvSdnn(latest.hrv_sdnn_ms) : null;
     const rhrNorm = latest.resting_hr != null ? normalizeRHR(latest.resting_hr) : null;
     const sleepNorm = normalizeSleep(latest.sleep_minutes, latest.sleep_efficiency);
 
-    // Weighted readiness score
     let readinessScore: number | null = null;
     if (hrvNorm != null && rhrNorm != null && sleepNorm != null) {
       readinessScore = Math.round(hrvNorm * 0.5 + rhrNorm * 0.3 + sleepNorm * 0.2);
@@ -93,7 +80,7 @@ export class AppleHealthProvider implements BiometricProvider {
       readinessScore = hrvNorm;
     }
 
-    const history = snapshots.length >= 7 ? this.buildHistory(snapshots) : undefined;
+    const history = rows.length >= 7 ? this.buildHistory(rows) : undefined;
 
     return {
       sleepScore: sleepNorm,
@@ -109,14 +96,11 @@ export class AppleHealthProvider implements BiometricProvider {
 
   async validateToken(token: string): Promise<boolean> {
     try {
-      const supabase = getSupabaseClient();
-      const oneYearAgo = new Date(Date.now() - 365 * 86400000).toISOString().split("T")[0];
-      const { data, error } = await supabase.rpc("get_apple_health_snapshots", {
-        p_user_id: token,
-        p_since_date: oneYearAgo,
-      });
-      if (error) return false;
-      return Array.isArray(data) && data.length > 0;
+      const { rows } = await getPool().query(
+        "SELECT 1 FROM public.apple_health_snapshots WHERE user_id = $1 LIMIT 1",
+        [token]
+      );
+      return rows.length > 0;
     } catch {
       return false;
     }
@@ -124,7 +108,6 @@ export class AppleHealthProvider implements BiometricProvider {
 
   private buildHistory(snapshots: AppleHealthSnapshot[]): BiometricHistory {
     const dates = snapshots.map((s) => s.date);
-
     const hrvValues = snapshots.map((s) =>
       s.hrv_sdnn_ms != null ? normalizeHrvSdnn(s.hrv_sdnn_ms) : 0
     );
@@ -139,7 +122,6 @@ export class AppleHealthProvider implements BiometricProvider {
     const sleepValues = snapshots.map((s) => normalizeSleep(s.sleep_minutes, s.sleep_efficiency) ?? 0);
     const bedtimeHours = snapshots.map((s) => s.bedtime_hour);
     const deepSleepMinutes = snapshots.map((s) => s.deep_sleep_minutes);
-
     return { hrvValues, readinessValues, sleepValues, dates, bedtimeHours, deepSleepMinutes };
   }
 }
