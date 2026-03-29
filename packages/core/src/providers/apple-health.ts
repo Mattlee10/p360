@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+import { resolve4 } from "dns/promises";
 import { BiometricData, BiometricHistory } from "../types";
 import { BiometricProvider } from "./provider";
 
@@ -14,15 +15,22 @@ interface AppleHealthSnapshot {
   created_at: string;
 }
 
-let pool: Pool | null = null;
+let poolPromise: Promise<Pool> | null = null;
 
-function getPool(): Pool {
-  if (!pool) {
-    const url = process.env.DATABASE_URL;
-    if (!url) throw new Error("DATABASE_URL required");
-    pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } });
-  }
-  return pool;
+async function getPool(): Promise<Pool> {
+  if (!poolPromise) poolPromise = createPool();
+  return poolPromise;
+}
+
+async function createPool(): Promise<Pool> {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL required");
+
+  const parsed = new URL(url);
+  const [ipv4] = await resolve4(parsed.hostname);
+  parsed.hostname = ipv4;
+
+  return new Pool({ connectionString: parsed.toString(), ssl: { rejectUnauthorized: false } });
 }
 
 function normalizeHrvSdnn(sdnn: number): number {
@@ -39,23 +47,14 @@ function normalizeSleep(sleepMinutes: number | null, sleepEfficiency: number | n
   return null;
 }
 
-/**
- * AppleHealthProvider
- *
- * Reads data from Supabase via direct pg connection (bypasses PostgREST).
- * The token is the user_id (e.g. "wa-61451024641").
- *
- * readinessScore formula:
- *   hrv_norm * 0.5 + rhr_norm * 0.3 + sleep_norm * 0.2
- */
 export class AppleHealthProvider implements BiometricProvider {
   readonly name = "apple-health";
   readonly displayName = "Apple Watch";
 
   async fetchBiometricData(token: string): Promise<BiometricData> {
     const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString().split("T")[0];
-
-    const { rows } = await getPool().query<AppleHealthSnapshot>(
+    const pool = await getPool();
+    const { rows } = await pool.query<AppleHealthSnapshot>(
       `SELECT user_id, date::text, hrv_sdnn_ms, resting_hr, sleep_minutes,
               deep_sleep_minutes, sleep_efficiency, bedtime_hour, created_at
        FROM public.apple_health_snapshots
@@ -96,7 +95,8 @@ export class AppleHealthProvider implements BiometricProvider {
 
   async validateToken(token: string): Promise<boolean> {
     try {
-      const { rows } = await getPool().query(
+      const pool = await getPool();
+      const { rows } = await pool.query(
         "SELECT 1 FROM public.apple_health_snapshots WHERE user_id = $1 LIMIT 1",
         [token]
       );

@@ -1,6 +1,4 @@
 import "dotenv/config";
-import { setDefaultResultOrder } from "node:dns";
-setDefaultResultOrder("ipv4first");
 import express from "express";
 import { handleWebhookVerify, handleWebhookPost } from "./webhook/handler";
 import { upsertAppleHealthSnapshot } from "./lib/storage";
