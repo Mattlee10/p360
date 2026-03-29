@@ -1,5 +1,4 @@
-import { Pool } from "pg";
-import { resolve4 } from "dns/promises";
+import { createClient } from "@supabase/supabase-js";
 import { BiometricData, BiometricHistory } from "../types";
 import { BiometricProvider } from "./provider";
 
@@ -15,22 +14,11 @@ interface AppleHealthSnapshot {
   created_at: string;
 }
 
-let poolPromise: Promise<Pool> | null = null;
-
-async function getPool(): Promise<Pool> {
-  if (!poolPromise) poolPromise = createPool();
-  return poolPromise;
-}
-
-async function createPool(): Promise<Pool> {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL required");
-
-  const parsed = new URL(url);
-  const [ipv4] = await resolve4(parsed.hostname);
-  parsed.hostname = ipv4;
-
-  return new Pool({ connectionString: parsed.toString(), ssl: { rejectUnauthorized: false } });
+function getSupabaseClient() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required");
+  return createClient(url, key);
 }
 
 function normalizeHrvSdnn(sdnn: number): number {
@@ -47,25 +35,36 @@ function normalizeSleep(sleepMinutes: number | null, sleepEfficiency: number | n
   return null;
 }
 
+/**
+ * AppleHealthProvider
+ *
+ * Reads data from Supabase apple_health_snapshots table.
+ * The token is the user_id (e.g. "wa-61451024641").
+ *
+ * readinessScore formula:
+ *   hrv_norm * 0.5 + rhr_norm * 0.3 + sleep_norm * 0.2
+ */
 export class AppleHealthProvider implements BiometricProvider {
   readonly name = "apple-health";
   readonly displayName = "Apple Watch";
 
   async fetchBiometricData(token: string): Promise<BiometricData> {
+    const supabase = getSupabaseClient();
     const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString().split("T")[0];
-    const pool = await getPool();
-    const { rows } = await pool.query<AppleHealthSnapshot>(
-      `SELECT user_id, date::text, hrv_sdnn_ms, resting_hr, sleep_minutes,
-              deep_sleep_minutes, sleep_efficiency, bedtime_hour, created_at
-       FROM public.apple_health_snapshots
-       WHERE user_id = $1 AND date >= $2
-       ORDER BY date ASC`,
-      [token, sixtyDaysAgo]
-    );
 
-    if (rows.length === 0) throw new Error(`No Apple Health data found for user: ${token}`);
+    const { data, error } = await supabase
+      .from("apple_health_snapshots")
+      .select("*")
+      .eq("user_id", token)
+      .gte("date", sixtyDaysAgo)
+      .order("date", { ascending: true });
 
-    const latest = rows[rows.length - 1];
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    if (!data || data.length === 0) throw new Error(`No Apple Health data found for user: ${token}`);
+
+    const snapshots = data as AppleHealthSnapshot[];
+    const latest = snapshots[snapshots.length - 1];
+
     const hrvNorm = latest.hrv_sdnn_ms != null ? normalizeHrvSdnn(latest.hrv_sdnn_ms) : null;
     const rhrNorm = latest.resting_hr != null ? normalizeRHR(latest.resting_hr) : null;
     const sleepNorm = normalizeSleep(latest.sleep_minutes, latest.sleep_efficiency);
@@ -79,7 +78,7 @@ export class AppleHealthProvider implements BiometricProvider {
       readinessScore = hrvNorm;
     }
 
-    const history = rows.length >= 7 ? this.buildHistory(rows) : undefined;
+    const history = snapshots.length >= 7 ? this.buildHistory(snapshots) : undefined;
 
     return {
       sleepScore: sleepNorm,
@@ -95,12 +94,14 @@ export class AppleHealthProvider implements BiometricProvider {
 
   async validateToken(token: string): Promise<boolean> {
     try {
-      const pool = await getPool();
-      const { rows } = await pool.query(
-        "SELECT 1 FROM public.apple_health_snapshots WHERE user_id = $1 LIMIT 1",
-        [token]
-      );
-      return rows.length > 0;
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from("apple_health_snapshots")
+        .select("user_id")
+        .eq("user_id", token)
+        .limit(1);
+      if (error) return false;
+      return (data?.length ?? 0) > 0;
     } catch {
       return false;
     }
