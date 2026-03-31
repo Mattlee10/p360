@@ -1,0 +1,25 @@
+{
+  "name": "p360-slack",
+  "version": "0.1.0",
+  "private": true,
+  "description": "P360 Slack Bot - Bio-data driven decision support",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@p360/core": "file:../../packages/core",
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@slack/bolt": "^4.0.0",
+    "node-cron": "^4.2.1",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/node-cron": "^3.0.0",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  }
+}

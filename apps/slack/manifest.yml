@@ -1,0 +1,37 @@
+display_information:
+  name: P360
+  description: Real-time bio-data driven decision support
+  background_color: "#0F172A"
+
+features:
+  bot_user:
+    display_name: P360
+    always_online: false
+  slash_commands:
+    - command: /p360-ask
+      description: AI-powered biometric decision support
+      usage_hint: "[question]"
+      should_escape: false
+    - command: /p360-connect
+      description: Connect Oura Ring or WHOOP
+      usage_hint: "[oura|whoop] [token]"
+      should_escape: false
+    - command: /p360-disconnect
+      description: Disconnect wearable
+      should_escape: false
+    - command: /p360-status
+      description: Check connection status
+      should_escape: false
+    - command: /p360-join
+      description: Start P360 beta onboarding
+      should_escape: false
+
+oauth_config:
+  scopes:
+    bot:
+      - commands
+
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: true
+  token_rotation_enabled: false
